@@ -33,8 +33,8 @@
   "checkDuplicates": true,
   "checkNearDuplicates": false,
   "sizeExceptionFile": "document-size-exceptions.json",
-  "tighten": { "mode": "safe" },
-  "dedupe": { "mode": "safe" }
+  "tighten": { "mode": "auto" },
+  "dedupe": { "mode": "auto" }
 }
 ```
 
@@ -51,12 +51,12 @@
 | `checkDuplicates`     | 完全一致の重複検査の有効・無効。既定は有効                           |
 | `checkNearDuplicates` | 準一致の重複検査の有効・無効。既定は無効（下記「準一致重複」を参照） |
 | `sizeExceptionFile`   | 文書サイズ例外一覧の配置先                                           |
-| `tighten`.mode        | `tighten-docs` の実行モード。`safe` は意味保持、`auto` は自律圧縮。既定は `safe`。 |
-| `dedupe`.mode         | `dedupe-docs` の実行モード。`safe` は既定の正本選定、`auto` は自律正本化。既定は `safe`。 |
+| `tighten`.mode        | `tighten-docs` の実行モード。`safe` は意味保持、`auto` は自律圧縮。既定は `auto`。 |
+| `dedupe`.mode         | `dedupe-docs` の実行モード。`safe` は既定外の正本選定、`auto` は自律正本化。既定は `auto`。 |
 
 `tighten` と `dedupe` は `mode` だけを持つオブジェクトであり、値は `safe` または
-`auto` に限る。設定があればスキルはその値を優先する。設定がない場合、通常呼び出しは
-`safe` とし、依頼文で自律モードを明示したときだけ `auto` として扱う。
+`auto` に限る。設定があればスキルはその値を優先する。設定がない場合は `auto` とする。
+利用者またはリポジトリが意味を変えない確認を優先する場合は、明示して `safe` を選ぶ。
 
 入力値の制約は[設定ファイルの入力検証](config-validation.md)を参照。
 

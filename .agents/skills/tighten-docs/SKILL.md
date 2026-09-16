@@ -35,8 +35,8 @@ description: >
 
 ## 実行モード
 
-`verify-docs.config.json` の `tighten.mode` は `safe`（意味保持、既定）か `auto`（自律圧縮）。
-設定がなければ、明示依頼時だけ `auto` とする。
+`tighten.mode` は `safe`（意味保持）か `auto`（既定の自律圧縮）。
+設定がなければ `auto`。利用者またはリポジトリが `safe` を明示した場合だけ意味保持モードに戻す。
 境界・保護対象・記録方法は
 [自律圧縮モード](../../../docs/autonomous-compression.md)を参照する。
 

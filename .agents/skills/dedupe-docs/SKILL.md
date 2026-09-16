@@ -31,8 +31,8 @@ description: >
 
 ## 実行モード
 
-`verify-docs.config.json` の `dedupe.mode` は、`safe` で既定の正本選定、`auto` で自律正本化を選ぶ。
-設定がなければ通常は `safe` とし、依頼文で自律正本化モードを明示したときだけ `auto` とする。
+`dedupe.mode` は、`safe` で保守的な正本選定、`auto` で既定の自律正本化を選ぶ。
+設定がなければ `auto`。利用者またはリポジトリが `safe` を明示した場合だけ保守的な選定に戻す。
 境界・保護対象・記録方法は
 [自律正本化モード](../../../docs/autonomous-canonicalization.md)を参照する。
 

@@ -118,7 +118,8 @@ test('dedupe-docs autonomous canonicalization mode completes cross-document cons
   assert.match(workflow, /自律正本化を依頼する例/);
   assert.match(workflow, /対象外の文書は変更しない/);
   assert.match(workflow, /入口だけで次に読む正本を選べる/);
-  assert.match(workflow, /継続的に\n自律再編する方針が決まった場合だけ設定を使う/);
+  assert.match(workflow, /既定で `dedupe-docs` は自律正本化モードで動く/);
+  assert.match(workflow, /"dedupe": \{ "mode": "safe" \}/);
 });
 
 test('mode comparison records measured compression separately from semantic fact coverage', () => {

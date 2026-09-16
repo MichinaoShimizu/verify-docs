@@ -34,9 +34,9 @@
   "checkNearDuplicates": false,
   "sizeExceptionFile": "document-size-exceptions.json",
   "tighten": {
-    "mode": "safe"
+    "mode": "auto"
   },
   "dedupe": {
-    "mode": "safe"
+    "mode": "auto"
   }
 }
