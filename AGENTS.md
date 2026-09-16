@@ -11,6 +11,31 @@
 - ドキュメントの分割・移動は移動とポインタ化のみ。要約・言い換えによる
   内容変更は禁止。
 
+<!-- verify-docs:required-skill:start -->
+## Markdown文書の変更
+
+Markdown文書を追加・更新・削除・レビューする際は、必ず`verify-docs`を使う。変更後に
+`node scripts/document-structure-verifier.mjs`を実行し、結果を報告する。文書の追加、移動、
+分割、削除、複数文書の変更、または違反の是正は、verify-docsの完全是正手順に従う。
+
+文書レビュー、複数のMarkdown文書の追加・更新・削除、または検証でサイズ超過・重複が
+見つかった回は、`verify-docs`、`dedupe-docs`、`tighten-docs`、最終`verify-docs`の順に
+実行する。dedupe-docsとtighten-docsは安全モードで意味を変えず、判断できない候補は
+利用者へ質問する。
+
+文書を変更した各工程の直後に`verify-docs`を再実行する。違反が残れば、その違反を生んだ
+工程へ戻って是正し、通過するまで次の工程または完了報告へ進まない。
+
+無駄を減らすレビューでは、dedupe-docsとtighten-docsの一巡を、文書の変更がなくなり
+verify-docsが通過するまで繰り返す。同じ候補を繰り返しても変更できない、または判断が
+必要な場合は利用者へ質問する。
+
+Markdownが100文書以上ある場合、文書を100件以下の読解単位に分けて記録する。ただし
+verify-docsによる機械検証は開始時と完了時に全件へ実行し、任意の抽出や一部の通過だけで
+完了にしない。dedupe-docsの候補と判断は単一の作業記録へ集約し、読解単位をまたぐ候補も
+比較する。
+<!-- verify-docs:required-skill:end -->
+
 ## セッションの開始
 
 - Git リポジトリで新規タスクを開始する場合は、共有 checkout ではなく新規 worktree を使用する。

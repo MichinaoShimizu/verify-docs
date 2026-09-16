@@ -16,6 +16,7 @@ node "$dir/scripts/document-structure-verifier.mjs" --root="$repo_root"
 node --test "$dir/scripts/document-structure-verifier.test.mjs"
 node --test "$dir/scripts/document-structure-extractor.test.mjs"
 node --test "$dir/scripts/benchmark-document-structure.test.mjs"
+node --test "$dir/scripts/evaluate-autonomous-output.test.mjs"
 node --test "$dir/scripts/select-canonical.test.mjs"
 node --test "$dir/scripts/skill-contracts.test.mjs"
 node --test "$dir/scripts/skill-evals.test.mjs"
@@ -59,12 +60,17 @@ git -C "$install_target" init -q
 grep -Fxq 'Preparing standalone skills...' "$install_log"
 grep -Fxq 'Installing verify-docs files...' "$install_log"
 grep -Fxq 'Created verify-docs.config.json with default settings' "$install_log"
+grep -Fxq 'Added required verify-docs instruction to AGENTS.md' "$install_log"
+grep -Fxq 'Added AGENTS.md import to CLAUDE.md' "$install_log"
 grep -Fq "Installed verify-docs into $install_target" "$install_log"
 if grep -Fq 'Prepared standalone skill distribution at ' "$install_log"; then
   echo "installer must not expose its temporary distribution directory" >&2
   exit 1
 fi
 (cd "$install_target" && bash "$distribution_dir/install.sh" --source "$distribution_dir")
+test "$(grep -Fxc '<!-- verify-docs:required-skill:start -->' "$install_target/AGENTS.md")" = "1"
+test "$(grep -Fxc '<!-- verify-docs:required-skill:end -->' "$install_target/AGENTS.md")" = "1"
+grep -Fqx '@AGENTS.md' "$install_target/CLAUDE.md"
 test "$(grep -Fxc '.verify-docs/dist/*.work.md' "$install_target/.gitignore")" = "1"
 git -C "$install_target" check-ignore -q --no-index -- .verify-docs/dist/verify-docs.work.md
 if git -C "$install_target" check-ignore -q --no-index -- .verify-docs/dist/maintenance-report.md; then
@@ -75,6 +81,7 @@ test -f "$install_target/scripts/document-structure-verifier.mjs"
 test -f "$install_target/scripts/markdown-structure.mjs"
 test -f "$install_target/scripts/document-structure-extractor.mjs"
 test -f "$install_target/scripts/select-canonical.mjs"
+test -f "$install_target/scripts/evaluate-autonomous-output.mjs"
 test -f "$install_target/scripts/vendor/commonmark.cjs"
 test -f "$install_target/scripts/vendor/commonmark-LICENSE.txt"
 cmp -s "$distribution_dir/verify-docs.config.json" "$install_target/verify-docs.config.json"
