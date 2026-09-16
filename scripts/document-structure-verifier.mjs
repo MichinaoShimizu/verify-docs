@@ -64,8 +64,8 @@
  *       "checkDuplicates": true,
  *       "checkNearDuplicates": false,
  *       "sizeExceptionFile": "document-size-exceptions.json",
- *       "tighten": { "mode": "safe" },
- *       "dedupe": { "mode": "safe" }
+ *       "tighten": { "mode": "auto" },
+ *       "dedupe": { "mode": "auto" }
  *     }
  *
  * 文書サイズ例外一覧（既定 document-size-exceptions.json）:
@@ -117,8 +117,8 @@ export const DEFAULTS = {
   checkDuplicates: true,
   checkNearDuplicates: false,
   sizeExceptionFile: 'document-size-exceptions.json',
-  tighten: { mode: 'safe' },
-  dedupe: { mode: 'safe' },
+  tighten: { mode: 'auto' },
+  dedupe: { mode: 'auto' },
 };
 
 function readJson(path, label) {

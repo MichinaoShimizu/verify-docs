@@ -21,6 +21,9 @@ Codex Appでは `@verify-docs`、Codex CLI/IDEでは `$verify-docs`、Claude Cod
 
 ## safe と auto
 
+導入時の既定は `auto` である。意味を変えない確認を優先する利用者またはリポジトリは、
+`verify-docs.config.json` で個別に `safe` を選ぶ。
+
 `safe` は意味、対象読者、条件、例外、手順順序を保てると確信できない候補を変更せず質問する。
 `auto` は質問待ちを理由に停止しないが、構造検証、対象外変更の禁止、数値・コマンド・設定値・
 法的・安全・契約上の注意の保護を解除しない。
