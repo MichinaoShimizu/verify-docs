@@ -116,7 +116,7 @@ node scripts/document-structure-verifier.mjs
   開始前から違反が残っていた場合は、開始時に `--json` の出力を保存し、
   `node scripts/document-structure-verifier.mjs --baseline=<保存したファイル>` が通過すること
   （新たな違反がないこと）で代える
-- 自分の一時作業記録に `### 最終検査結果` を記載し、[保守報告](../../../docs/work-records-and-report.md#保守報告)へ統合している
+- 自分の一時作業記録に `### 最終検査結果` を記載し、[保守報告](../../../docs/work-records-and-report.md#保守報告)へ統合している（続けて実行する場合は最後のスキルの完了時にまとめて）
 
 ## 制約と対象外
 
