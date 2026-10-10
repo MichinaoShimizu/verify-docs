@@ -44,6 +44,9 @@ dedupe-docs と tighten-docs の一巡を変更がなくなるまで繰り返す
 | 文書サイズ | `maxDocBytes` 以下、または文書サイズ例外一覧に理由を記録済みである | `node scripts/document-structure-verifier.mjs` | サイズ違反0件 |
 | 機械的重複 | 完全一致と、有効時の準一致の段落重複を検出・是正済みである | `node scripts/document-structure-verifier.mjs` | 重複違反0件 |
 
+開始前から違反が残っていて `--baseline` で完了を確認した場合は、表の後に基準にあった違反の件数と、
+完了時に残った違反の件数を種別ごとに記す。
+
 ### 文書重複解消スキル
 
 自律正本化モードで実行した場合は、表の前に `実行モード: 自律正本化` を記す。元文書、

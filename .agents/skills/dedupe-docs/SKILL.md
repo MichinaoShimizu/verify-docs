@@ -71,7 +71,7 @@ node scripts/document-structure-extractor.mjs --root=. README.md docs/guide.md
 ```
 
 対象が多い場合は、パスを複数指定し `--format=tsv` で1段落1行の一覧にし、`--format=pairs` で文書間の言い換え候補を挙げる。出力の `headingPath`・
-位置（`sourcepos`・`line`）・`text` を使って同じ主張の比較候補を整理し、必ず原文も確認する。
+位置（`sourcepos`・`line`）・`text`（`pairs` では `left`・`right` の位置と本文の冒頭）を使って同じ主張の比較候補を整理し、必ず原文も確認する。
 この一覧は候補の棚卸しに限り、意味的な重複の判定や統合可否は自動決定しない。
 
 意味的重複を疑う着眼点は[重複検査の設定と例外](../../../docs/duplicate-handling.md#意味的重複を疑う着眼点)を参照する。

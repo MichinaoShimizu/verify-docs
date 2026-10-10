@@ -7,7 +7,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { parseMarkdown } from './markdown-structure.mjs';
+import { hasMarkdownExtension, markdownExtensions, parseMarkdown } from './markdown-structure.mjs';
 
 const USAGE = [
   'Usage: node scripts/check-preserved-content.mjs --base=<git-rev> [--root=<dir>] [--per-file] [--json] [<file.md>...]',
@@ -21,7 +21,8 @@ const KINDS = { codeBlock: 'コードブロック', codeSpan: 'コードスパ�
 const URL_PATTERN = /https?:\/\/[^\s<>()[\]"'`]+/g;
 
 const normalizeBlock = (text) => text.split(/\r?\n/).map((line) => line.trimEnd()).join('\n').trim();
-const isMarkdown = (path) => /\.mdx?$/i.test(path) && !/(^|\/)(node_modules|\.git|\.verify-docs)\//.test(path);
+const isMarkdownIn = (extensions) => (path) =>
+  hasMarkdownExtension(path, extensions) && !/(^|\/)(node_modules|\.git|\.verify-docs)\//.test(path);
 
 /** 文書から照合対象（コードブロック・コードスパン・URL）を出現行つきで取り出す。 */
 export function extractPreservedContent(source) {
@@ -129,6 +130,7 @@ if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pat
   }
   const root = resolve(args.find((arg) => arg.startsWith('--root='))?.slice('--root='.length) ?? '.');
   const only = new Set(args.filter((arg) => !arg.startsWith('-')));
+  const isMarkdown = isMarkdownIn(markdownExtensions(root));
 
   let before;
   let after;

@@ -2,7 +2,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
-import { extractProseBlocks, findSimilarBlocks } from './markdown-structure.mjs';
+import { extractProseBlocks, findSimilarBlocks, hasMarkdownExtension, markdownExtensions } from './markdown-structure.mjs';
 
 const args = process.argv.slice(2);
 const rootOption = args.find((arg) => arg.startsWith('--root='));
@@ -30,6 +30,7 @@ if (paths.length === 0) {
 }
 
 const documents = [];
+const extensions = markdownExtensions(ROOT);
 for (const path of paths) {
   const absolute = resolve(ROOT, path);
   const relativePath = relative(ROOT, absolute);
@@ -37,7 +38,7 @@ for (const path of paths) {
     console.error(`リポジトリ外のパスは指定できません: ${path}`);
     process.exit(2);
   }
-  if (!/\.mdx?$/i.test(absolute)) {
+  if (!hasMarkdownExtension(absolute, extensions)) {
     console.error(`Markdownファイルを指定してください: ${path}`);
     process.exit(2);
   }
