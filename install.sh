@@ -3,16 +3,27 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--source SOURCE_DIR]
+Usage: install.sh [--update] [--source SOURCE_DIR]
 
 Install verify-docs into the current repository root. --source is intended for
 local development and tests; normal use downloads the package from GitHub.
+
+--update replaces the files verify-docs manages (its scripts and the
+verify-docs, dedupe-docs and tighten-docs skills) and the verify-docs block in
+AGENTS.md with this version. Files no longer part of a bundled skill are
+deleted. verify-docs.config.json, document-size-exceptions.json and
+maintenance reports are kept.
 EOF
 }
 
 source_root=""
+update=0
 while (($#)); do
   case "$1" in
+    --update)
+      update=1
+      shift
+      ;;
     --source)
       if (($# < 2)); then
         usage >&2
@@ -196,21 +207,8 @@ validate_required_skill_instructions() {
   fi
 }
 
-ensure_required_skill_instruction() {
-  local agents="$target_root/AGENTS.md"
-
-  if [[ -f "$agents" ]] && grep -Fqx "$required_instruction_start" "$agents"; then
-    echo "Kept required verify-docs instruction in AGENTS.md"
-    return
-  fi
-  if [[ ! -e "$agents" ]]; then
-    printf '# Agent Instructions\n' > "$agents"
-  fi
-  if [[ -s "$agents" ]]; then
-    printf '\n' >> "$agents"
-  fi
-  printf '%s\n' "$required_instruction_start" >> "$agents"
-  cat >> "$agents" <<'EOF'
+required_instruction_body() {
+  cat <<'EOF'
 ## Markdown文書の変更
 
 Markdown文書を追加・更新・削除・レビューする際は、必ず`verify-docs`を使う。変更後に
@@ -234,7 +232,45 @@ verify-docsによる機械検証は開始時と完了時に全件へ実行し、
 完了にしない。dedupe-docsの候補と判断は単一の作業記録へ集約し、読解単位をまたぐ候補も
 比較する。
 EOF
-  printf '%s\n' "$required_instruction_end" >> "$agents"
+}
+
+ensure_required_skill_instruction() {
+  local agents="$target_root/AGENTS.md"
+
+  if [[ -f "$agents" ]] && grep -Fqx "$required_instruction_start" "$agents"; then
+    if ((update)); then
+      local body_file replaced
+      body_file="$(mktemp)"
+      replaced="$(mktemp)"
+      required_instruction_body > "$body_file"
+      awk -v start="$required_instruction_start" -v end="$required_instruction_end" -v body_file="$body_file" '
+        $0 == start { print; while ((getline line < body_file) > 0) print line; skipping = 1; next }
+        $0 == end { skipping = 0 }
+        !skipping { print }
+      ' "$agents" > "$replaced"
+      if cmp -s "$replaced" "$agents"; then
+        echo "Kept required verify-docs instruction in AGENTS.md"
+      else
+        cat "$replaced" > "$agents"
+        echo "Updated required verify-docs instruction in AGENTS.md"
+      fi
+      rm "$body_file" "$replaced"
+      return
+    fi
+    echo "Kept required verify-docs instruction in AGENTS.md"
+    return
+  fi
+  if [[ ! -e "$agents" ]]; then
+    printf '# Agent Instructions\n' > "$agents"
+  fi
+  if [[ -s "$agents" ]]; then
+    printf '\n' >> "$agents"
+  fi
+  {
+    printf '%s\n' "$required_instruction_start"
+    required_instruction_body
+    printf '%s\n' "$required_instruction_end"
+  } >> "$agents"
   echo "Added required verify-docs instruction to AGENTS.md"
 }
 
@@ -275,10 +311,11 @@ for item in "${files[@]}"; do
   fi
 done
 
-if ((${#conflicts[@]})); then
+if ((${#conflicts[@]} && ! update)); then
   echo "verify-docs installation stopped; these files already exist with different contents:" >&2
   printf '  %s\n' "${conflicts[@]}" >&2
   echo "Review or move the conflicting files, then run the installer again." >&2
+  echo "To replace them with this version of verify-docs, run the installer with --update." >&2
   exit 1
 fi
 
@@ -318,25 +355,42 @@ if ((${#skill_alias_conflicts[@]})); then
 fi
 
 echo "Installing verify-docs files..."
+updated=0
+copy_managed_file() {
+  local source_file="$1"
+  local target_file="$2"
+  if [[ ! -e "$target_file" ]]; then
+    mkdir -p "$(dirname "$target_file")"
+    cp "$source_file" "$target_file"
+  elif ((update)) && ! cmp -s "$source_file" "$target_file"; then
+    cp "$source_file" "$target_file"
+    updated=$((updated + 1))
+  fi
+}
 for item in "${files[@]}"; do
   item_root="$(item_source_root "$item")"
   if [[ -d "$item_root/$item" ]]; then
     while IFS= read -r -d '' source_file; do
       relative_path="${source_file#"$item_root/"}"
-      target_file="$target_root/$relative_path"
-      if [[ ! -e "$target_file" ]]; then
-        mkdir -p "$(dirname "$target_file")"
-        cp "$source_file" "$target_file"
-      fi
+      copy_managed_file "$source_file" "$target_root/$relative_path"
     done < <(find "$item_root/$item" -type f -print0)
-  else
-    target_file="$target_root/$item"
-    if [[ ! -e "$target_file" ]]; then
-      mkdir -p "$(dirname "$target_file")"
-      cp "$item_root/$item" "$target_file"
+    # 同梱スキルは verify-docs が所有するため、新しい版にないファイルを残さない。
+    if ((update)) && [[ "$item" == .agents/skills/* && -d "$target_root/$item" ]]; then
+      while IFS= read -r -d '' target_file; do
+        relative_path="${target_file#"$target_root/"}"
+        if [[ ! -e "$item_root/$relative_path" ]]; then
+          rm "$target_file"
+          echo "Removed $relative_path (no longer part of verify-docs)"
+        fi
+      done < <(find "$target_root/$item" -type f -print0)
     fi
+  else
+    copy_managed_file "$item_root/$item" "$target_root/$item"
   fi
 done
+if ((update)); then
+  echo "Updated $updated verify-docs files"
+fi
 
 ensure_work_record_ignore
 ensure_default_config

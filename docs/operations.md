@@ -13,7 +13,10 @@
 | リポジトリ内パス | `install.sh` |
 | 配布先パス | なし（導入時に取得して実行する） |
 
-verify-docs パッケージ一式を導入先のリポジトリへ配置する。
+verify-docs パッケージ一式を導入先のリポジトリへ配置する。既存のファイルと内容が異なる場合は
+導入を止める。`--update` を付けると、verify-docs が管理するスクリプトと同梱スキル、AGENTS.md の
+verify-docs の指示ブロックを新しい版に置き換え、同梱スキルから外れたファイルを削除する。
+`verify-docs.config.json`・`document-size-exceptions.json`・保守報告は変更しない。
 
 ## 文書検証パッケージ自己検査
 

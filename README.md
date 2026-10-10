@@ -17,6 +17,9 @@ Markdown文書群の検査・改善パッケージ。CommonMark ASTを基盤に�
 curl -fsSL https://raw.githubusercontent.com/MichinaoShimizu/verify-docs/main/install.sh | bash
 ```
 
+導入済みのリポジトリを新しい版へ更新するときは、末尾を `| bash -s -- --update` にする。
+スクリプトと同梱スキルを置き換え、`verify-docs.config.json` と保守報告は残す。
+
 既存スキルがある導入先の扱いは[互換構成](docs/agent-compatibility.md)を参照。
 
 ## Skills
