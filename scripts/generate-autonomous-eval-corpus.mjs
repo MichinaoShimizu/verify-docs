@@ -3,12 +3,21 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+const USAGE = 'Usage: node scripts/generate-autonomous-eval-corpus.mjs --root=DIR [--clusters=N]';
+function usageError(message) {
+  console.error(`${message}\n${USAGE}`);
+  process.exit(2);
+}
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log(USAGE);
+  process.exit(0);
+}
 const rootArg = process.argv.find((arg) => arg.startsWith('--root='));
 const clustersArg = process.argv.find((arg) => arg.startsWith('--clusters='));
-if (!rootArg) throw new Error('--root=PATH is required');
+if (!rootArg) usageError('--root=PATH is required');
 const root = resolve(rootArg.slice(7));
 const clusters = Number(clustersArg?.slice(11) ?? 30);
-if (!Number.isInteger(clusters) || clusters < 1) throw new Error('clusters must be positive');
+if (!Number.isInteger(clusters) || clusters < 1) usageError('--clusters must be a positive integer');
 const baseline = join(root, 'baseline');
 const reference = join(root, 'reference-output');
 rmSync(root, { recursive: true, force: true });

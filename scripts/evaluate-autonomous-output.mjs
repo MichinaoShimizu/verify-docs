@@ -57,13 +57,22 @@ export function evaluateAutonomousOutput({ baseline, output, manifest }) {
   };
 }
 
+const USAGE = 'Usage: node scripts/evaluate-autonomous-output.mjs --baseline=DIR --output=DIR --manifest=FILE';
+
 function option(name) {
   const value = process.argv.find((arg) => arg.startsWith(`--${name}=`));
-  if (!value) throw new Error(`--${name}=PATH is required`);
+  if (!value) {
+    console.error(`--${name}=PATH is required\n${USAGE}`);
+    process.exit(2);
+  }
   return resolve(value.slice(name.length + 3));
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
+  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    console.log(USAGE);
+    process.exit(0);
+  }
   const baseline = option('baseline');
   const output = option('output');
   const manifest = JSON.parse(readFileSync(option('manifest'), 'utf8'));

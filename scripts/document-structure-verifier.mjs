@@ -992,8 +992,33 @@ export function printVerificationReport(verificationReport, { json = false } = {
   }
 }
 
+const USAGE = [
+  'Usage: node scripts/document-structure-verifier.mjs [options]',
+  '  --root=<dir>             検査するリポジトリの根（既定: カレント）',
+  '  --config=<file>          設定ファイル（既定: <root>/verify-docs.config.json）',
+  '  --json                   結果を JSON で出す',
+  '  --changed-base=<ref>     その Git 参照からの差分に関係する違反だけを報告する',
+  '  --baseline=<file>        以前の --json 出力にない新たな違反だけを報告する',
+  '  --init-size-exceptions   上限超過の文書を文書サイズ例外一覧に書き出して終わる',
+].join('\n');
+const KNOWN_FLAGS = new Set(['json', 'init-size-exceptions', 'help']);
+const KNOWN_OPTIONS = new Set(['root', 'config', 'changed-base', 'baseline']);
+
 function main() {
   const args = process.argv.slice(2);
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(USAGE);
+    return 0;
+  }
+  const unknown = args.filter((arg) => {
+    const match = arg.match(/^--([^=]+)(=.*)?$/);
+    if (!match) return true;
+    return match[2] === undefined ? !KNOWN_FLAGS.has(match[1]) : !KNOWN_OPTIONS.has(match[1]);
+  });
+  if (unknown.length > 0) {
+    console.error(`未対応の引数: ${unknown.join(' ')}\n${USAGE}`);
+    return 2;
+  }
   const flag = (name) => args.includes(`--${name}`);
   const option = (name, fallback) => {
     const hit = args.find((arg) => arg.startsWith(`--${name}=`));
