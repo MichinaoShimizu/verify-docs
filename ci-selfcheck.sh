@@ -156,6 +156,16 @@ printf '.verify-docs/dist/*.work.md\n' > "$legacy_ignore_target/.gitignore"
 git -C "$legacy_ignore_target" check-ignore -q --no-index -- .verify-docs/dist/baseline.work.json
 rm -rf "$legacy_ignore_target"
 
+printf '{"maxDocBytes": 9000}\n' > "$install_target/verify-docs.config.json"
+printf 'stale\n' > "$install_target/.agents/skills/dedupe-docs/references/stale.md"
+printf 'old\n' > "$install_target/scripts/document-structure-verifier.mjs"
+(cd "$install_target" && bash "$dir/install.sh" --update --source "$dir" >/dev/null)
+cmp -s "$dir/scripts/document-structure-verifier.mjs" "$install_target/scripts/document-structure-verifier.mjs"
+test ! -e "$install_target/.agents/skills/dedupe-docs/references/stale.md"
+grep -Fq '"maxDocBytes": 9000' "$install_target/verify-docs.config.json"
+test "$(grep -Fxc '<!-- verify-docs:required-skill:start -->' "$install_target/AGENTS.md")" = "1"
+cp "$distribution_dir/verify-docs.config.json" "$install_target/verify-docs.config.json"
+
 printf 'conflict\n' > "$install_target/scripts/document-structure-verifier.mjs"
 if (cd "$install_target" && bash "$dir/install.sh" --source "$dir" >/dev/null 2>&1); then
   echo "installer must not overwrite a conflicting file" >&2
