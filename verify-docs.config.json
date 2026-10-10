@@ -28,6 +28,7 @@
     "build/",
     ".verify-docs/"
   ],
+  "orphanExemptPaths": [],
   "maxDocBytes": 7000,
   "minDuplicateChars": 60,
   "checkDuplicates": true,

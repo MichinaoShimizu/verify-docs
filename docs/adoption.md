@@ -42,7 +42,7 @@ node scripts/document-structure-verifier.mjs --init-size-exceptions
 | 重複が大量に出る | パッケージごとの `CHANGELOG.md` に同じ変更が並ぶ | `CHANGELOG.md` を `excludePaths` に加える |
 | リンク切れ・孤立が大量に出る | テスト用の文書（`__fixtures__/` など）や生成物 | そのディレクトリを `excludePaths` に加える |
 | リンク切れが大量に出る | 静的サイト生成向けの拡張子なしリンク（`./guide`）やサイトルート基準のリンク（`/guide/`） | 検査はリポジトリ内でたどれるパスだけを正とする。`guide.md` のような実在するパスへ書き換える |
-| 孤立が大量に出る | サイドバー設定など、Markdown 以外からだけ到達する文書 | 入口文書か索引文書からリンクする |
+| 孤立が大量に出る | サイドバー設定など、Markdown 以外からだけ到達する文書 | 入口文書か索引文書からリンクする。リンクを置かない文書群は、そのディレクトリを `orphanExemptPaths` に加えて孤立チェックだけを免除する |
 
 `excludePaths` の項目は、`node_modules/` と `.git/` を除き、リポジトリ直下からの
 位置で照合する（[検査対象と設定方針](scan-targets.md)）。
