@@ -290,6 +290,28 @@ test('excludePaths entries starting with **/ match at any depth', () => {
   rmSync(root, { recursive: true, force: true });
 });
 
+test('text output lists violation hotspots only when violations are numerous', () => {
+  const files = { 'README.md': '# Repo\n' };
+  for (let i = 0; i < 20; i++) files[`packages/a/__fixtures__/f${i}.md`] = `# F${i}\n`;
+  files['docs/one.md'] = '# One\n';
+  const many = makeRepo(files);
+  const output = (() => {
+    try { execFileSync('node', [SCRIPT, `--root=${many}`], { encoding: 'utf8', stdio: 'pipe' }); return ''; }
+    catch (error) { return error.stderr; }
+  })();
+  assert.match(output, /違反の多いディレクトリ（上位5件）:\n  - packages\/a\/__fixtures__\/ — 20件（孤立 20）\n  - docs\/ — 1件（孤立 1）/);
+  assert.match(output, /excludePaths/);
+  rmSync(many, { recursive: true, force: true });
+
+  const few = makeRepo({ 'README.md': '# Repo\n', 'docs/one.md': '# One\n' });
+  const fewOutput = (() => {
+    try { execFileSync('node', [SCRIPT, `--root=${few}`], { encoding: 'utf8', stdio: 'pipe' }); return ''; }
+    catch (error) { return error.stderr; }
+  })();
+  assert.doesNotMatch(fewOutput, /違反の多いディレクトリ/);
+  rmSync(few, { recursive: true, force: true });
+});
+
 test('uses legacy .claude/skills when .agents/skills is absent', () => {
   const root = makeRepo({
     'README.md': '# Repo\n',
