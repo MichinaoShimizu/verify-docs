@@ -93,7 +93,9 @@ node scripts/document-structure-verifier.mjs
 
 - `node scripts/document-structure-verifier.mjs` の実行結果が「文書構造: すべて通過」
   である（`document-size-exceptions.json` に理由付きで明示的に残した超過は
-  例外として許容する）
+  例外として許容する）。開始前から違反が残っていた場合は、[作業単位の基準](../../../docs/work-record-lifecycle.md#作業単位の基準)を渡した
+  `--baseline=.verify-docs/dist/baseline.work.json` での実行が通過すること
+  （新たな違反がないこと）で代える
 - 検査結果に複数件出力された違反は、一時作業記録の全項目にチェックが
   入っている
 - 自分の一時作業記録に `### 最終検査結果` を記載して[保守報告](../../../docs/work-records-and-report.md#保守報告)へ統合し（続けて実行する場合は最後のスキルの完了時にまとめて）、作業完了を報告する際は

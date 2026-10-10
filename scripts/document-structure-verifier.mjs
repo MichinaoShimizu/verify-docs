@@ -779,6 +779,7 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
           `意図した重複なら段落の前に ${ALLOW_MARKER} を置く`,
         {
           location: locationFor(first, firstOccurrence.block.sourcepos),
+          text: normalized,
           occurrences: occurrences.map(({ doc, block }) => ({
             location: locationFor(doc, block.sourcepos),
           })),
@@ -842,7 +843,7 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
         rest.join(', '),
         `句読点・敬体/常体だけが違う、ほぼ同じ説明が複数の文書にある（正規化後: 「${snippet}」）。` +
           `1か所にまとめて他方からリンクするか、意図した表記差なら段落の前に ${ALLOW_MARKER} を置く`,
-        { location: locationFor(first, group.docs.get(first).block.sourcepos) },
+        { location: locationFor(first, group.docs.get(first).block.sourcepos), text: fuzzy },
       );
     }
   }
@@ -880,7 +881,13 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
   // 新たに生じた違反だけを報告する。既存の違反を抱えた文書群で、作業が違反を
   // 増やしていないことを確かめるためである。サイズ超過は、基準時より大きくなった
   // 場合に新たな違反として扱う（既に超過していた文書へ内容を移す変更を見逃さないため）。
-  const baselineKey = ({ kind, from, target }) => JSON.stringify([kind, from, target]);
+  // 重複は本文で照合し、出現する文書が基準時の部分集合なら既存とみなす（同じ文書の組に
+  // 別の段落が重複した場合を見逃さず、一部の文書だけ解消した場合を新たな違反にしない）。
+  const DUPLICATE_KINDS = new Set(['duplicate', 'near-duplicate']);
+  const duplicateDocs = ({ from, target }) => [from, ...String(target).split(', ')];
+  const baselineKey = (violation) => DUPLICATE_KINDS.has(violation.kind)
+    ? JSON.stringify([violation.kind, violation.text ?? violation.reason])
+    : JSON.stringify([violation.kind, violation.from, violation.target]);
   let baseline = null;
   if (baselinePath !== undefined) {
     const report = readJson(baselinePath, `基準ファイル ${baselinePath}`);
@@ -889,17 +896,30 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
     }
     baseline = {
       path: baselinePath,
-      entries: new Map(report.violations.map((violation) => [baselineKey(violation), violation])),
+      entries: report.violations.reduce((entries, violation) => {
+        const key = baselineKey(violation);
+        if (!entries.has(key)) entries.set(key, []);
+        entries.get(key).push(violation);
+        return entries;
+      }, new Map()),
       suppressed: 0,
     };
   }
   function inBaseline(violation) {
-    const known = baseline?.entries.get(baselineKey(violation));
-    if (!known) return false;
+    const candidates = baseline?.entries.get(baselineKey(violation));
+    if (!candidates) return false;
+    if (DUPLICATE_KINDS.has(violation.kind)) {
+      const docs = duplicateDocs(violation);
+      return candidates.some((known) => {
+        const knownDocs = new Set(duplicateDocs(known));
+        return docs.every((doc) => knownDocs.has(doc));
+      });
+    }
+    const [known] = candidates;
     if (violation.kind !== 'size') return true;
     if (!(violation.bytes > known.bytes)) return true;
     violation.baselineBytes = known.bytes;
-    violation.message += `。基準時 ${known.bytes} バイトから ${violation.bytes - known.bytes} バイト増えた`;
+    violation.reason += `。基準時 ${known.bytes} バイトから ${violation.bytes - known.bytes} バイト増えた`;
     return false;
   }
   const scopedViolations = violations.filter(violationTouchesChangedPath).filter((violation) => {
