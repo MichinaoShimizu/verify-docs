@@ -514,7 +514,7 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
   for (const doc of documents) {
     for (const [, token] of bodies.get(doc).matchAll(/`([^`\n]+)`/g)) {
       const path = token.trim().replace(/[、。）)]+$/, '');
-      if (!config.pathRoots.some((root) => path.startsWith(root))) continue;
+      if (!config.pathRoots.some((pathRoot) => path.startsWith(pathRoot))) continue;
       if (PLACEHOLDER.test(path)) continue;
 
       if (!existsSync(join(repoRoot, path.replace(/\/$/, '')))) {
