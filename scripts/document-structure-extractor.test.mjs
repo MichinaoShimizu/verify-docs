@@ -82,6 +82,21 @@ test('CLI --format=tsv prints one block per line with tabs and newlines flattene
   });
 });
 
+test('CLI --format=pairs lists paraphrase candidates across documents, most similar first', () => {
+  withTempRepo((root) => {
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    writeFileSync(join(root, 'README.md'), '# Home\n\nThe installer copies the scripts and the skills into the repository and adds an ignore rule.\n');
+    writeFileSync(join(root, 'docs/install.md'), '# Install\n\nThe installer copies scripts and skills into your repository and adds one ignore rule.\n\nUnrelated paragraph about configuring the maximum document size in bytes.\n');
+    const output = execFileSync('node', [SCRIPT, '--root=.', '--format=pairs', 'README.md', 'docs/install.md'], { cwd: root, encoding: 'utf8' });
+    const [header, ...rows] = output.trimEnd().split('\n');
+    assert.equal(header, 'similarity\tcontainment\tleft\tright\tleftText\trightText');
+    assert.equal(rows.length, 1);
+    const [similarity, , left, right] = rows[0].split('\t');
+    assert.deepEqual([left, right], ['README.md:3', 'docs/install.md:3']);
+    assert.ok(Number(similarity) >= 0.3);
+  });
+});
+
 test('section metrics stop at the next heading of the same or higher level', () => {
   const source = '# First\n\nFirst section.\n\n## Child\n\nChild section.\n\n# Second\n\nSecond section.\n';
   const result = extractProseBlocks(source);

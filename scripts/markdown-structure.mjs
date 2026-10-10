@@ -123,3 +123,50 @@ export function extractProseBlocks(
     blocks,
   };
 }
+
+/*
+ * 文書間で言い換えの可能性がある段落の組を、文字3-gramの重なりで候補として挙げる。
+ * 意味の判定はしない。全段落を読み比べる代わりに、読む候補を絞るための一覧である。
+ * どの文書にも出る定型の3-gramは候補を増やすだけなので索引に入れない。
+ */
+export function findSimilarBlocks(documents, { minSimilarity = 0.3, minContainment = 0.6, minChars = 40 } = {}) {
+  const normalize = (text) => text.replace(/[\s、。,.:：「」『』（）()]/g, '');
+  const blocks = documents.flatMap(({ path, blocks: documentBlocks }) =>
+    documentBlocks.map((block) => ({ path, block, normalized: normalize(block.text) })));
+  const grams = blocks.map(({ normalized }) => {
+    const set = new Set();
+    for (let index = 0; index + 3 <= normalized.length; index++) set.add(normalized.slice(index, index + 3));
+    return set;
+  });
+  const frequency = new Map();
+  for (const set of grams) for (const gram of set) frequency.set(gram, (frequency.get(gram) ?? 0) + 1);
+  const commonLimit = Math.max(20, Math.ceil(blocks.length * 0.02));
+  const index = new Map();
+  blocks.forEach(({ normalized }, position) => {
+    if (normalized.length < minChars) return;
+    for (const gram of grams[position]) {
+      if (frequency.get(gram) > commonLimit) continue;
+      if (!index.has(gram)) index.set(gram, []);
+      index.get(gram).push(position);
+    }
+  });
+  const pairs = [];
+  blocks.forEach(({ path, normalized }, left) => {
+    if (normalized.length < minChars) return;
+    const shared = new Map();
+    for (const gram of grams[left]) {
+      for (const right of index.get(gram) ?? []) {
+        if (right > left && blocks[right].path !== path) shared.set(right, (shared.get(right) ?? 0) + 1);
+      }
+    }
+    for (const [right, count] of shared) {
+      const sizes = [grams[left].size, grams[right].size];
+      const similarity = count / (sizes[0] + sizes[1] - count);
+      const containment = count / Math.min(...sizes);
+      if (similarity >= minSimilarity || containment >= minContainment) {
+        pairs.push({ similarity, containment, left: blocks[left], right: blocks[right] });
+      }
+    }
+  });
+  return pairs.sort((a, b) => b.similarity - a.similarity || b.containment - a.containment);
+}

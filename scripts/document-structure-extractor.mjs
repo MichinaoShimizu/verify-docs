@@ -2,7 +2,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
-import { extractProseBlocks } from './markdown-structure.mjs';
+import { extractProseBlocks, findSimilarBlocks } from './markdown-structure.mjs';
 
 const args = process.argv.slice(2);
 const rootOption = args.find((arg) => arg.startsWith('--root='));
@@ -12,14 +12,15 @@ const format = formatOption?.slice('--format='.length) ?? 'json';
 const paths = args.filter((arg) => !arg.startsWith('--'));
 
 if (args.includes('--help') || args.includes('-h')) {
-  console.log('Usage: node scripts/document-structure-extractor.mjs [--root=<dir>] [--format=json|tsv] <file.md>...');
+  console.log('Usage: node scripts/document-structure-extractor.mjs [--root=<dir>] [--format=json|tsv|pairs] <file.md>...');
   console.log('Extract CommonMark headings and prose paragraphs as JSON with source lines and byte counts.');
   console.log('--format=tsv prints one block per line (path, line, bytes, heading path, text) for reviewing many documents.');
+  console.log('--format=pairs lists paragraph pairs in different documents whose wording overlaps (candidate paraphrases), most similar first.');
   process.exit(0);
 }
 
-if (!['json', 'tsv'].includes(format)) {
-  console.error(`--format は json または tsv にしてください: ${format}`);
+if (!['json', 'tsv', 'pairs'].includes(format)) {
+  console.error(`--format は json・tsv・pairs のいずれかにしてください: ${format}`);
   process.exit(2);
 }
 
@@ -53,9 +54,24 @@ for (const path of paths) {
   });
 }
 
-if (format === 'tsv') {
+const cell = (value) => String(value).replace(/[\t\r\n]+/g, ' ');
+
+if (format === 'pairs') {
+  // 文書間の言い換え候補。類似度・包含率の高い順に、両側の位置と本文の冒頭を並べる。
+  const excerpt = (text) => (text.length > 120 ? `${text.slice(0, 120)}…` : text);
+  console.log(['similarity', 'containment', 'left', 'right', 'leftText', 'rightText'].join('\t'));
+  for (const { similarity, containment, left, right } of findSimilarBlocks(documents)) {
+    console.log([
+      similarity.toFixed(2),
+      containment.toFixed(2),
+      `${left.path}:${left.block.sourcepos.start.line}`,
+      `${right.path}:${right.block.sourcepos.start.line}`,
+      excerpt(left.block.text),
+      excerpt(right.block.text),
+    ].map(cell).join('\t'));
+  }
+} else if (format === 'tsv') {
   // 多数の文書を棚卸しするときの一覧。1ブロック1行で、本文中のタブと改行は空白にする。
-  const cell = (value) => String(value).replace(/[\t\r\n]+/g, ' ');
   console.log(['path', 'line', 'bytes', 'headingPath', 'text'].join('\t'));
   for (const document of documents) {
     for (const block of document.blocks) {

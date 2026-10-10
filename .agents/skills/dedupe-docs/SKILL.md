@@ -70,7 +70,7 @@ node scripts/document-structure-verifier.mjs
 node scripts/document-structure-extractor.mjs --root=. README.md docs/guide.md
 ```
 
-対象が多い場合は、パスを複数指定し `--format=tsv` で1段落1行の一覧にする。出力の `headingPath`・
+対象が多い場合は、パスを複数指定し `--format=tsv` で1段落1行の一覧にし、`--format=pairs` で文書間の言い換え候補を挙げる。出力の `headingPath`・
 位置（`sourcepos`・`line`）・`text` を使って同じ主張の比較候補を整理し、必ず原文も確認する。
 この一覧は候補の棚卸しに限り、意味的な重複の判定や統合可否は自動決定しない。
 
