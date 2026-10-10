@@ -42,6 +42,19 @@ Markdown文書の見出し・段落・位置・バイト数を抽出する。
 
 比較済みの事実と文書の役割から、正本を自動選定できる候補だけを返す。事実が矛盾する場合や、双方に固有の事実がある場合は選定しない。
 
+### 保護内容照合器
+
+| 項目 | 値 |
+| --- | --- |
+| 和名 | 保護内容照合器 |
+| 英名 | PreservedContentChecker |
+| ファイル名 | `check-preserved-content.mjs` |
+| リポジトリ内パス | `scripts/check-preserved-content.mjs` |
+| 配布先パス | `scripts/check-preserved-content.mjs` |
+
+基準コミットの文書にあったコードブロック・コードスパン・URL のうち、作業後の文書群のどこにも
+残っていないものを列挙する。文章の言い換えは判定しない。
+
 ### Markdown構造解析器
 
 | 項目 | 値 |
