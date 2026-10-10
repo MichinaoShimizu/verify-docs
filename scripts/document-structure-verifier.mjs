@@ -94,7 +94,8 @@
  *   --config=<file> 設定ファイルの場所（既定: <root>/verify-docs.config.json）
  *   --json          結果を JSON で出す
  *   --changed-base=<ref> そのGit参照からの差分に関係する違反だけを報告する（移動元・削除済みパスも含む）
- *   --baseline=<file> 以前の --json 出力にある違反（種別・発生元・対象が同じもの）を除き、新たな違反だけを報告する
+ *   --baseline=<file> 以前の --json 出力にある違反（種別・発生元・対象が同じもの）を除き、新たな違反だけを報告する。
+ *                         サイズ超過は基準時より大きくなれば新たな違反とする
  *   --init-size-exceptions いま上限を超えている文書を全部例外一覧に書き出して終わる
  *                   （検査は走らせない）。既存リポジトリに導入する最初の1回に使う。
  *                   すでにファイルがあれば上書きせず失敗する（手で消してから）
@@ -848,7 +849,8 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
   }
   // --baseline: 以前の --json 出力にある違反（種別・発生元・対象が同じもの）を除き、
   // 新たに生じた違反だけを報告する。既存の違反を抱えた文書群で、作業が違反を
-  // 増やしていないことを確かめるためである。
+  // 増やしていないことを確かめるためである。サイズ超過は、基準時より大きくなった
+  // 場合に新たな違反として扱う（既に超過していた文書へ内容を移す変更を見逃さないため）。
   const baselineKey = ({ kind, from, target }) => JSON.stringify([kind, from, target]);
   let baseline = null;
   if (baselinePath !== undefined) {
@@ -856,10 +858,23 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
     if (report?.kind !== 'DocumentStructureVerificationReport' || !Array.isArray(report.violations)) {
       throw new Error(`基準ファイル ${baselinePath} は --json の出力ではありません`);
     }
-    baseline = { path: baselinePath, keys: new Set(report.violations.map(baselineKey)), suppressed: 0 };
+    baseline = {
+      path: baselinePath,
+      entries: new Map(report.violations.map((violation) => [baselineKey(violation), violation])),
+      suppressed: 0,
+    };
+  }
+  function inBaseline(violation) {
+    const known = baseline?.entries.get(baselineKey(violation));
+    if (!known) return false;
+    if (violation.kind !== 'size') return true;
+    if (!(violation.bytes > known.bytes)) return true;
+    violation.baselineBytes = known.bytes;
+    violation.message += `。基準時 ${known.bytes} バイトから ${violation.bytes - known.bytes} バイト増えた`;
+    return false;
   }
   const scopedViolations = violations.filter(violationTouchesChangedPath).filter((violation) => {
-    if (!baseline?.keys.has(baselineKey(violation))) return true;
+    if (!inBaseline(violation)) return true;
     baseline.suppressed += 1;
     return false;
   });

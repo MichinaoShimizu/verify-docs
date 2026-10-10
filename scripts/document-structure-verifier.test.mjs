@@ -350,6 +350,32 @@ test('--baseline reports only violations absent from a saved --json report', () 
   rmSync(root, { recursive: true, force: true });
 });
 
+test('--baseline reports an over-size document again when it grows', () => {
+  const big = `# Big\n\n${'a'.repeat(200)}\n`;
+  const root = makeRepo({
+    'README.md': '# Repo\n\n[big](docs/big.md)\n',
+    'docs/big.md': big,
+    'verify-docs.config.json': JSON.stringify({ maxDocBytes: 100 }),
+  });
+  const baselinePath = join(root, 'baseline.json');
+  writeFileSync(baselinePath, JSON.stringify(run(root)));
+  assert.deepEqual(verifyDocumentStructure(root, { baselinePath }).violations, []);
+  writeFileSync(join(root, 'docs/big.md'), big.replace('a', ''));
+  assert.deepEqual(verifyDocumentStructure(root, { baselinePath }).violations, []);
+  writeFileSync(join(root, 'docs/big.md'), `${big}more\n`);
+  const grown = verifyDocumentStructure(root, { baselinePath });
+  assert.deepEqual(grown.violations.map(({ kind, bytes, baselineBytes }) => [kind, bytes, baselineBytes]), [['size', 213, 208]]);
+  assert.match(grown.violations[0].message, /5 バイト増えた/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+test('--baseline rejects a file that is not a report', () => {
+  const root = makeRepo({ 'README.md': '# Repo\n' });
+  writeFileSync(join(root, 'not-a-report.json'), '{"kind":"other"}');
+  assert.throws(() => verifyDocumentStructure(root, { baselinePath: join(root, 'not-a-report.json') }), /--json の出力ではありません/);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('CLI prints usage for --help and rejects unknown arguments', () => {
   const help = execFileSync('node', [SCRIPT, '--help'], { encoding: 'utf8' });
   assert.match(help, /^Usage: node scripts\/document-structure-verifier\.mjs/);
