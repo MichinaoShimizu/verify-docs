@@ -886,6 +886,8 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
   return verificationReport;
 }
 
+const HOTSPOT_THRESHOLD = 20;
+
 export function printVerificationReport(verificationReport, { json = false } = {}) {
   if (json) {
     console.log(JSON.stringify(verificationReport, null, 2));
@@ -934,6 +936,31 @@ export function printVerificationReport(verificationReport, { json = false } = {
             `${f.location.headingPath?.length ? ` / ${f.location.headingPath.join(' > ')}` : ''})`
           : '';
         console.error(`  - [${label[f.kind]}] ${f.from} → ${f.target}${where} — ${f.reason}`);
+      }
+      // 導入直後は数百件の違反が出ることがある。違反の集中するディレクトリを示し、
+      // 検査範囲から外すべきもの（テスト用の文書・複製・生成物）を見つけやすくする。
+      if (violations.length >= HOTSPOT_THRESHOLD) {
+        const byDirectory = new Map();
+        for (const f of violations) {
+          const parts = f.from.split('/');
+          const directory = parts.length > 1 ? parts.slice(0, Math.min(parts.length - 1, 3)).join('/') + '/' : '(ルート)';
+          const kinds = byDirectory.get(directory) ?? new Map();
+          kinds.set(f.kind, (kinds.get(f.kind) ?? 0) + 1);
+          byDirectory.set(directory, kinds);
+        }
+        const total = (kinds) => [...kinds.values()].reduce((sum, count) => sum + count, 0);
+        const hotspots = [...byDirectory]
+          .sort((a, b) => total(b[1]) - total(a[1]) || a[0].localeCompare(b[0]))
+          .slice(0, 5);
+        console.error('\n違反の多いディレクトリ（上位5件）:');
+        for (const [directory, kinds] of hotspots) {
+          const breakdown = [...kinds].sort((a, b) => b[1] - a[1]).map(([kind, count]) => `${label[kind]} ${count}`).join('・');
+          console.error(`  - ${directory} — ${total(kinds)}件（${breakdown}）`);
+        }
+        console.error(
+          '検査範囲外の文書（テスト用の文書・版ごとの複製・生成物）なら excludePaths で、' +
+          'Markdown 以外から到達する文書の孤立なら orphanExemptPaths で外せる。それ以外は文書を直す。',
+        );
       }
     } else {
       console.log('\n文書構造: すべて通過');
