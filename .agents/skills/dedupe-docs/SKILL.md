@@ -88,8 +88,8 @@ node scripts/document-structure-extractor.mjs --root=. README.md docs/guide.md
 ### 3. 判定と対応
 
 [正本候補の選定規約](../../../docs/canonical-selection.md)と
-[判定と利用者への質問](../../../docs/judgement-and-escalation.md)に従う。既定では選定規約の
-`auto-canonical`条件を満たす場合だけ、片方をポインタに置換できる。自律正本化モードでは
+[判定と利用者への質問](../../../docs/judgement-and-escalation.md)に従う。`safe` では選定規約の
+`auto-canonical`条件を満たす場合だけ、片方をポインタに置換できる。`auto`（既定）では
 [自律正本化モード](../../../docs/autonomous-canonicalization.md)の統合・削除規則に従う。
 
 本手順の判定は[文書構造検証器](../../../docs/verification-boundaries.md#検証器とプレイブックの責務)と異なり再現性を持たない（同じ入力でも見落とし・
@@ -108,11 +108,14 @@ node scripts/document-structure-verifier.mjs
 以下を全て満たした時点で完了とする。
 
 - 一時作業記録の全項目にチェックが入っている
-- 既定では、確信できた重複は是正済みであり、確信が持てなかった候補は利用者の回答に
-  従って対応済みである。自律正本化モードでは、統合・ポインタ化・削除または保護対象の
+- `safe` では、確信できた重複は是正済みであり、確信が持てなかった候補は利用者の回答に
+  従って対応済みである。`auto`（既定）では、統合・ポインタ化・削除または保護対象の
   判断とリスクを記録している
 - 「4. 是正後再検査」の `node scripts/document-structure-verifier.mjs` が
-  「文書構造: すべて通過」で終わっている
+  「文書構造: すべて通過」で終わっている。
+  開始前から違反が残っていた場合は、開始時に `--json` の出力を保存し、
+  `node scripts/document-structure-verifier.mjs --baseline=<保存したファイル>` が通過すること
+  （新たな違反がないこと）で代える
 - 自分の一時作業記録に `### 最終検査結果` を記載し、[保守報告](../../../docs/work-records-and-report.md#保守報告)へ統合している
 
 ## 制約と対象外

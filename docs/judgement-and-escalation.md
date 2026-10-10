@@ -2,7 +2,7 @@
 
 正本の選定は[正本候補の選定規約](canonical-selection.md)を先に適用する。
 
-利用者が `dedupe-docs` の自律正本化モードを明示した場合は、
+`dedupe.mode` が `auto`（既定）の場合は、
 [自律正本化モード](autonomous-canonicalization.md)がこの資料の質問待ち規則に優先する。
 
 - **確信できる場合**（同じ主張を別の言葉で書いているだけと判断できる）→

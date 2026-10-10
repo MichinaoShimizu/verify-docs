@@ -94,6 +94,7 @@
  *   --config=<file> 設定ファイルの場所（既定: <root>/verify-docs.config.json）
  *   --json          結果を JSON で出す
  *   --changed-base=<ref> そのGit参照からの差分に関係する違反だけを報告する（移動元・削除済みパスも含む）
+ *   --baseline=<file> 以前の --json 出力にある違反（種別・発生元・対象が同じもの）を除き、新たな違反だけを報告する
  *   --init-size-exceptions いま上限を超えている文書を全部例外一覧に書き出して終わる
  *                   （検査は走らせない）。既存リポジトリに導入する最初の1回に使う。
  *                   すでにファイルがあれば上書きせず失敗する（手で消してから）
@@ -256,7 +257,7 @@ function loadSizeExceptions(repoRoot, config) {
   return entries;
 }
 
-export function verifyDocumentStructure(root, { configPath, initSizeExceptions = false, changedBase } = {}) {
+export function verifyDocumentStructure(root, { configPath, initSizeExceptions = false, changedBase, baselinePath } = {}) {
   const repoRoot = resolve(root);
   const changed = changedBase === undefined ? null : changedPathsSince(changedBase);
   const changedPaths = changed?.paths ?? null;
@@ -845,7 +846,23 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
     for (const occurrence of violation.occurrences ?? []) paths.push(occurrence.location?.path);
     return paths.filter(Boolean).some((path) => changedPaths.has(path.split('#', 1)[0]));
   }
-  const scopedViolations = violations.filter(violationTouchesChangedPath);
+  // --baseline: 以前の --json 出力にある違反（種別・発生元・対象が同じもの）を除き、
+  // 新たに生じた違反だけを報告する。既存の違反を抱えた文書群で、作業が違反を
+  // 増やしていないことを確かめるためである。
+  const baselineKey = ({ kind, from, target }) => JSON.stringify([kind, from, target]);
+  let baseline = null;
+  if (baselinePath !== undefined) {
+    const report = readJson(baselinePath, `基準ファイル ${baselinePath}`);
+    if (report?.kind !== 'DocumentStructureVerificationReport' || !Array.isArray(report.violations)) {
+      throw new Error(`基準ファイル ${baselinePath} は --json の出力ではありません`);
+    }
+    baseline = { path: baselinePath, keys: new Set(report.violations.map(baselineKey)), suppressed: 0 };
+  }
+  const scopedViolations = violations.filter(violationTouchesChangedPath).filter((violation) => {
+    if (!baseline?.keys.has(baselineKey(violation))) return true;
+    baseline.suppressed += 1;
+    return false;
+  });
   const violationsByKind = Object.fromEntries(
     [...new Set(scopedViolations.map(({ kind }) => kind))]
       .sort()
@@ -875,6 +892,7 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
     kind: 'DocumentStructureVerificationReport',
     summary,
     violations: scopedViolations,
+    ...(baseline ? { baseline: { path: baseline.path, suppressed: baseline.suppressed } } : {}),
     ...(changedPaths ? {
       changed: {
         base: changedBase,
@@ -904,6 +922,11 @@ export function printVerificationReport(verificationReport, { json = false } = {
       'near-duplicate': '準一致重複',
       'stale-size-exception': '文書サイズ例外の掃除',
     };
+    if (verificationReport.baseline) {
+      console.log(
+        `基準 ${verificationReport.baseline.path} にある既存の違反 ${verificationReport.baseline.suppressed} 件を除外`,
+      );
+    }
     console.log(
       `文書 ${summary.documents.count} 件（見出し ${summary.documents.headings} 件・` +
       `段落 ${summary.documents.paragraphs} 件・${summary.documents.bytes} バイト、文書サイズ例外 ${summary.sizeExceptions.count} 件）を検査`,
@@ -984,6 +1007,7 @@ function main() {
       configPath,
       initSizeExceptions: flag('init-size-exceptions'),
       changedBase: option('changed-base', undefined),
+      baselinePath: option('baseline', undefined),
     });
     if (result.initializedSizeExceptions) {
       const { path, count } = result.initializedSizeExceptions;
