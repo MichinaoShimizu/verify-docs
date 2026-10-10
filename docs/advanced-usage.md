@@ -21,8 +21,8 @@ node scripts/document-structure-verifier.mjs --changed-base=origin/main
 
 ## 文書構造スナップショットのJSON出力
 
-[文書構造抽出器](structure.md#文書構造抽出器)は、文書重複解消スキル／文書簡潔化スキルで対象文書を調べるときに、CommonMarkの見出し階層と段落を
-JSON出力できる。意味的な重複や冗長性は判定しない。
+[文書構造抽出器](structure.md#文書構造抽出器)は、文書重複解消スキル／文書簡潔化スキルで対象文書を調べるときに使う。
+意味的な重複や冗長性は判定しない。
 
 ```bash
 node scripts/document-structure-extractor.mjs --root=. README.md docs/guide.md
@@ -60,10 +60,8 @@ node scripts/benchmark-document-structure.mjs --documents=1000 --paragraphs=20 -
 
 ## 正本候補の機械判定
 
-[正本候補の選定規約](canonical-selection.md)に従い、比較した二つの候補をJSONで渡す。`facts`は、候補から人またはエージェントが取り出した事実であり、判定器が意味を推測して作るものではない。
+[正本候補の選定規約](canonical-selection.md)に従い、比較した二つの候補をJSONで渡す。入力の`facts`と出力の判定は[判定器への入力](canonical-selection.md#判定器への入力)を参照する。
 
 ```bash
 node scripts/select-canonical.mjs candidate-pair.json
 ```
-
-`auto-canonical`は、正本が他方の事実を全て含み、明示的な正本または詳細文書である場合だけ返す。`decision-required`と`conflict`は利用者の判断を必要とするため、ポインタ化しない。

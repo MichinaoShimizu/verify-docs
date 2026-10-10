@@ -3,7 +3,12 @@
 [README.md](../README.md)から参照される。`docs/` 内のスキル補助文書はここを正本とし、
 ソースの各 `SKILL.md` はここを直接参照する。`install.sh` は
 `prepare-skill-distribution.mjs` を実行し、各スキルから到達可能な文書だけを配布用の
-`references/` へコピーして、配布版の `SKILL.md` のリンクを書き換える。
+`references/` へコピーして、配布版の `SKILL.md` のリンクを書き換える。到達可能な文書は、
+ソースの各 `SKILL.md` が `docs/` へ張ったリンクを起点に再帰的に求める。配布用の
+`references/` はインストール時だけ一時生成し、リポジトリには含めない。
+
+`docs/` 内のスキル補助文書を変更した場合は、自己検査で
+`node scripts/prepare-skill-distribution.mjs` を実行する。
 
 ## 文書重複解消スキル
 

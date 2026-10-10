@@ -18,21 +18,18 @@ bash scripts/start-worktree.sh <task-name>
 worktree で作業する。既定の配置先を変える場合は第2引数に未作成の絶対パスを渡す。
 
 - 改修後、自身に対して検査を通過させる（ドッグフーディング）。本リポジトリ
-  （claude-kit）では [文書検証パッケージ自己検査](docs/operations.md#文書検証パッケージ自己検査)を実行すればよい。
+  （claude-kit）では [文書検証パッケージ自己検査](docs/operations.md#文書検証パッケージ自己検査)を実行する。
   CI の自動探索方法は
   [リポジトリのCI定義](.github/workflows/ci.yml)
   を参照する
-- `docs/` 内のスキル補助文書を変更した場合は、自己検査で
-  `node scripts/prepare-skill-distribution.mjs` を実行する。このコマンドはソースの各
-  `SKILL.md` が `docs/` へ張ったリンクを起点に、必要な文書を再帰的に求める。
-  配布用の `references/` はインストール時だけ一時生成し、リポジトリには含めない
+- `docs/` 内のスキル補助文書を変更した場合は、
+  [スキル補助文書の正本](docs/skill-references.md)に従う
 - 挙動を変更した場合、`SKILL.md`・`docs/config.md`・README.md の
   該当箇所を同一コミットで更新する（コードのみ改修し説明が旧状態のまま
-  残ると、本一式自体が文書の重複・不整合を起こす）。`DEFAULTS` にキーを
-  追加した場合、正本である `docs/config.md` の表への追記を
-  `document-structure-verifier.test.mjs`（「every DEFAULTS key is documented in
-  config.md」）が機械的に検査する。README.md 側は個々のキー名を列挙しない
-  （正本は [config.md](docs/config.md)）
+  残ると、本一式自体が文書の重複・不整合を起こす）。`DEFAULTS` に追加したキーの
+  記載先と機械検査は[文書構造検証設定](docs/config.md#文書構造検証設定)を参照する（検査は
+  `document-structure-verifier.test.mjs` の「every DEFAULTS key is documented in
+  config.md」）
 - 「機械的に真偽が判定できるか」を超える判断（表記ゆれの許容、意味的な
   類似判定など）は[文書構造検証器](docs/structure.md#文書構造検証器)に組み込まない。必要なら
   [文書重複解消スキル](.agents/skills/dedupe-docs/SKILL.md#文書重複解消スキル)のような

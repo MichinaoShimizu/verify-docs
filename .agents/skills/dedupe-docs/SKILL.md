@@ -31,17 +31,14 @@ description: >
 
 ## 実行モード
 
-`dedupe.mode` は、`safe` で保守的な正本選定、`auto` で既定の自律正本化を選ぶ。
-設定がなければ `auto`。利用者またはリポジトリが `safe` を明示した場合だけ保守的な選定に戻す。
-境界・保護対象・記録方法は
-[自律正本化モード](../../../docs/autonomous-canonicalization.md)を参照する。
+`dedupe.mode` の `safe`（保守的な正本選定）と `auto`（既定の自律正本化）の選び方、
+境界・保護対象・記録方法は[自律正本化モード](../../../docs/autonomous-canonicalization.md)を参照する。
 
 ## 前提条件
 
 対象リポジトリに文書構造是正スキル一式（`scripts/document-structure-verifier.mjs` と
 `.agents/skills/verify-docs/`）が導入済みであること。検査対象・設定・
-規約（`allow-duplicate` マーカーなど）は流用する。文書構造是正スキル自体の規約は
-文書構造是正スキルの規約を参照する。
+規約（`allow-duplicate` マーカーなど）は流用する。
 
 ## 実施手順
 
@@ -104,15 +101,13 @@ node scripts/document-structure-extractor.mjs --root=. README.md docs/guide.md
 node scripts/document-structure-verifier.mjs
 ```
 
-ポインタ化に伴うリンク切れ・断片リンク切れ・サイズ超過が発生していないか
-確認し、本スキルの是正が文書構造是正スキルの検査を新たに壊していないか確認する。
+ポインタ化に伴うリンク切れ・断片リンク切れ・サイズ超過が発生していないか確認する。
 
 ## 完了基準
 
 以下を全て満たした時点で完了とする。
 
-- 一時作業記録の全項目にチェックが入っている（未確認のまま残っている
-  文書が無い）
+- 一時作業記録の全項目にチェックが入っている
 - 既定では、確信できた重複は是正済みであり、確信が持てなかった候補は利用者の回答に
   従って対応済みである。自律正本化モードでは、統合・ポインタ化・削除または保護対象の
   判断とリスクを記録している

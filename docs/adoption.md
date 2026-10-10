@@ -16,7 +16,7 @@
 node scripts/document-structure-verifier.mjs --init-size-exceptions
 ```
 
-サイズ上限を超えている文書を全て抽出し`document-size-exceptions.json`に書き出す。
+サイズ上限を超えている文書を全て`document-size-exceptions.json`に書き出す。
 これらのサイズ超過は例外扱いとなり、検査結果の一覧には出続ける。リンク切れ・孤立・重複など
 他の違反は例外にならないため、別途是正する。
 
@@ -27,15 +27,9 @@ node scripts/document-structure-verifier.mjs --init-size-exceptions
 [文書構造の是正手順「2. 肥大化文書の特定」](remediation.md#2-肥大化文書の特定)
 を参照する。
 
-重複はサイズ超過と異なり例外化しない。導入時に検出された場合は一方へ統合して
-ポインタに置換する。意図した重複には`<!-- verify-docs:allow-duplicate -->`を
-付与する。詳しくは
+重複はサイズ超過と異なり例外化しない。導入時に検出された場合の是正方法は
 [文書構造の是正手順「3. 重複特定」](remediation.md#3-重複特定)
 を参照する。
-
-## 保守報告の作業単位
-
-[保守報告の作業単位](work-record-lifecycle.md)を参照。
 
 ## CIへの組み込み
 
@@ -44,9 +38,4 @@ node scripts/document-structure-verifier.mjs --init-size-exceptions
 
 ## 文書サイズ例外の管理
 
-`document-size-exceptions.json` は、上限を超過している文書を後で是正するための一覧である。
-記述形式と運用ルールの正本は
-[文書サイズ例外一覧の形式](document-size-exceptions.md)を参照する。
-
-文書サイズ例外は導入直後から削減する方向にのみ運用する。際限なく増やすと、肥大化検知が
-負債を許容する仕組みに変わる。導入直後より件数が増えていれば退行の目安となる。
+記述形式と運用ルールは[文書サイズ例外一覧の形式](document-size-exceptions.md)を参照する。
