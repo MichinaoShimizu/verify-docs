@@ -99,6 +99,7 @@ files=(
   scripts/document-structure-extractor.mjs
   scripts/select-canonical.mjs
   scripts/evaluate-autonomous-output.mjs
+  scripts/check-preserved-content.mjs
   scripts/vendor
   .agents/skills/verify-docs
   .agents/skills/dedupe-docs

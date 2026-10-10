@@ -203,6 +203,9 @@ test('skill instructions keep deterministic contracts separate from semantic jud
   assert.match(dedupeJudgement, /自分で追加したりしない/);
   assert.match(dedupeJudgement, /保守報告へ統合しない/);
   assert.match(autonomousCanonicalization, /文書構造: すべて通過/);
+  for (const autonomous of [autonomousCanonicalization, autonomousCompression]) {
+    assert.match(autonomous, /check-preserved-content\.mjs --base=<開始コミット>/);
+  }
   assert.match(tighten, /数値・条件・手順の順序・免責文言は一字一句変更しない/);
   assert.match(autonomousCompression, /利用者に質問する/);
   assert.match(autonomousCompression, /保守報告へ\n?統合しない/);
