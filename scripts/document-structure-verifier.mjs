@@ -21,7 +21,7 @@
  *
  * 見ているもの:
  *   - マークダウンリンクの飛び先が実在するか（外部 URL は見ない）
- *   - 断片（`#見出し`）が、その文書の見出しに実在するか
+ *   - 断片（`#見出し`）が、その文書の見出し、または HTML の id・name 属性に実在するか
  *   - 本文にバッククォートで書いたリポジトリ内のパスが実在するか
  *   - entryPoints・スキルの SKILL.md 以外の文書のうち、docsDir 配下の文書が
  *     どこかから参照されているか（孤立していないか）。エージェント設定用
@@ -411,16 +411,27 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
     const body = stripFences(source);
     bodies.set(doc, body);
     const ids = new Set();
+    // `<a name="step1"></a>` のような HTML の id・name 属性も断片の飛び先になる。
+    // 見出しの重複番号（-1, -2）は見出しだけで数えるため、別に集めて最後に合わせる。
+    const htmlIds = new Set();
     const walker = tree.walker();
     let event;
     while ((event = walker.next())) {
-      if (!event.entering || event.node.type !== 'heading') continue;
+      if (!event.entering) continue;
+      if (event.node.type === 'html_inline' || event.node.type === 'html_block') {
+        for (const [, id] of event.node.literal.matchAll(/\b(?:id|name)\s*=\s*["']([^"']+)["']/gi)) {
+          htmlIds.add(id);
+        }
+        continue;
+      }
+      if (event.node.type !== 'heading') continue;
       const base = slug(markdownText(event.node));
       let id = base;
       let suffix = 1;
       while (ids.has(id)) id = `${base}-${suffix++}`;
       ids.add(id);
     }
+    for (const id of htmlIds) ids.add(id);
     fragments.set(doc, ids);
   }
 
