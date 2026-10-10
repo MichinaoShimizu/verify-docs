@@ -66,7 +66,7 @@ description: >
 node scripts/document-structure-extractor.mjs --root=. README.md docs/guide.md
 ```
 
-対象が多い場合は、一時作業記録に列挙したパスを複数指定する。`bytes` はMarkdown記法を含む
+対象が多い場合は、パスを複数指定し `--format=tsv` で1段落1行の一覧にする。`bytes` はMarkdown記法を含む
 元ソース範囲のサイズであり、抽出結果は候補の棚卸しに限る。必ず原文と「不変条件」を確認する。
 `headings` の `bytes` と `paragraphCount` は子見出し以下を含むため、親子の値を合算しない。
 

@@ -63,6 +63,25 @@ test('CLI returns multiple requested documents as JSON with repository-relative 
   });
 });
 
+test('CLI --format=tsv prints one block per line with tabs and newlines flattened', () => {
+  withTempRepo((root) => {
+    writeFileSync(join(root, 'README.md'), '# Home\n\n## Setup\n\nFirst line\nsecond\tline.\n');
+    const output = execFileSync('node', [SCRIPT, '--root=.', '--format=tsv', 'README.md'], { cwd: root, encoding: 'utf8' });
+    const [header, ...rows] = output.trimEnd().split('\n');
+    assert.equal(header, 'path\tline\tbytes\theadingPath\ttext');
+    assert.equal(rows.length, 1);
+    const [path, line, bytes, headingPath, text] = rows[0].split('\t');
+    assert.deepEqual([path, line, headingPath, text], ['README.md', '5', 'Home > Setup', 'First line second line.']);
+    assert.ok(Number(bytes) > 0);
+    try {
+      execFileSync('node', [SCRIPT, '--format=xml', 'README.md'], { cwd: root, encoding: 'utf8', stdio: 'pipe' });
+      assert.fail('expected --format=xml to be rejected');
+    } catch (error) {
+      assert.equal(error.status, 2);
+    }
+  });
+});
+
 test('section metrics stop at the next heading of the same or higher level', () => {
   const source = '# First\n\nFirst section.\n\n## Child\n\nChild section.\n\n# Second\n\nSecond section.\n';
   const result = extractProseBlocks(source);

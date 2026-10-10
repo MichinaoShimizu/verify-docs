@@ -41,6 +41,8 @@ node scripts/document-structure-extractor.mjs --root=. README.md docs/guide.md
 
 各指定文書について、DocumentStructureSnapshot（文書構造スナップショット）として見出し階層・段落・位置・バイト数を返す。出力項目の使い方は各スキルの手順を参照。
 
+多数の文書を棚卸しするときは `--format=tsv` を付ける。1段落を1行（パス・開始行・バイト数・見出し階層・本文）で出力し、JSON より大幅に小さい（vite の 40KB の文書で JSON 158KB に対し TSV 38KB）。
+
 ## 既存のサイズ超過の例外記録
 
 既存文書に違反があるリポジトリでは、最初に次を実行する。
