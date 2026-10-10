@@ -245,6 +245,24 @@ test('does not scan a symlinked compatibility skill directory twice', () => {
   rmSync(root, { recursive: true, force: true });
 });
 
+test('skill references reachable through other references of the same skill are not orphans', () => {
+  const root = makeRepo({
+    'README.md': '# Repo\n',
+    '.agents/skills/example/SKILL.md': '# Example\n\n[first](references/first.md)\n',
+    '.agents/skills/example/references/first.md': '# First\n\n[second](second.md)\n',
+    '.agents/skills/example/references/second.md': '# Second\n',
+    '.agents/skills/example/references/unreachable.md': '# Unreachable\n\n[second](second.md)\n',
+    '.agents/skills/other/SKILL.md': '# Other\n\n[foreign](../example/references/foreign.md)\n',
+    '.agents/skills/example/references/foreign.md': '# Foreign\n',
+  });
+  const orphans = run(root).violations.filter((f) => f.kind === 'orphan').map((f) => f.from).sort();
+  assert.deepEqual(orphans, [
+    '.agents/skills/example/references/foreign.md',
+    '.agents/skills/example/references/unreachable.md',
+  ]);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('agent configuration docs are exempt from orphan checks', () => {
   const root = makeRepo({
     'README.md': '# Repo\n',
@@ -377,6 +395,36 @@ test('detects duplicate paragraphs across docs', () => {
     ['docs/a.md', 'docs/b.md'],
   );
   rmSync(root, { recursive: true, force: true });
+});
+
+test('identical skill reference copies are compared once, diverged copies are reported', () => {
+  const shared =
+    'This paragraph is intentionally long enough to trigger duplicate detection logic here.';
+  const files = {
+    'README.md': '# Repo\n',
+    '.agents/skills/a/SKILL.md': '# A\n\n[guide](references/guide.md)\n',
+    '.agents/skills/b/SKILL.md': '# B\n\n[guide](references/guide.md)\n',
+    '.agents/skills/a/references/guide.md': `# Guide\n\n${shared}\n`,
+    '.agents/skills/b/references/guide.md': `# Guide\n\n${shared}\n`,
+  };
+  const identical = makeRepo(files);
+  assert.deepEqual(run(identical).violations, []);
+  rmSync(identical, { recursive: true, force: true });
+
+  const diverged = makeRepo({
+    ...files,
+    '.agents/skills/b/references/guide.md': `# Guide\n\n${shared}\n\nEdited only in b.\n`,
+  });
+  assert.ok(run(diverged).violations.some((f) => f.kind === 'duplicate'));
+  rmSync(diverged, { recursive: true, force: true });
+
+  const elsewhere = makeRepo({ ...files, 'docs/copy.md': `# Copy\n\n${shared}\n`, 'README.md': '# Repo\n\n[copy](docs/copy.md)\n' });
+  const violation = run(elsewhere).violations.find((f) => f.kind === 'duplicate');
+  assert.deepEqual(
+    violation.occurrences.map(({ location }) => location.path).sort(),
+    ['.agents/skills/a/references/guide.md', 'docs/copy.md'],
+  );
+  rmSync(elsewhere, { recursive: true, force: true });
 });
 
 test('AST duplicate comparison ignores inline emphasis differences', () => {

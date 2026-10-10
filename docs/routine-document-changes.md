@@ -5,7 +5,7 @@
 文書サイズ、同一段落の重複を壊していないことを確認する。
 
 コードだけを変更し、Markdownを読まず作らず変えない回は対象外とする。対象となる
-Markdownには、README、CLAUDE.md、AGENTS.md、`docs/`、スキルの`SKILL.md`のほか、
+Markdownには、README、CLAUDE.md、AGENTS.md、docs/、スキルの`SKILL.md`のほか、
 リポジトリ内で追加、更新、削除する`.md`ファイルを含める。
 
 導入器は、ルートの`AGENTS.md`へこの規約を管理ブロックとして追加する。`CLAUDE.md`には

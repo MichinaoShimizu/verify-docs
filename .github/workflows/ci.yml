@@ -60,7 +60,7 @@ jobs:
           test -f "$target_root/scripts/document-structure-verifier.mjs"
           test -f "$target_root/.agents/skills/verify-docs/references/config.md"
           test ! -e "$target_root/docs"
-          node "$target_root/scripts/document-structure-verifier.mjs" --root="$target_root/scripts"
+          node "$target_root/scripts/document-structure-verifier.mjs" --root="$target_root"
           {
             echo '## Remote install smoke test'
             echo
