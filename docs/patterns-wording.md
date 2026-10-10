@@ -27,3 +27,13 @@
   （例:「〜のの」「〜するする」）
 - **概数の二重化**: 概数表現を二重に示しているだけの箇所
   （例:「約100個程度」→「約100個」）
+
+## 英語文書での相当表現
+
+上のパターンは日本語の例で示している。英語文書では、同じ役割の表現を対象にする。
+
+- **枕詞・冗長接続**: `Note that`、`Basically,`、`simply`、`just`、
+  `The reason … is because` → `because`
+- **冗長な可能表現・形式名詞**: `is able to` → `can`、`the fact that` → `that`
+- **「〜を行う」表現**: `perform a test` → `test`、`make a decision` → `decide`
+- **冗長な条件節**: `in the case that` → `if`、`in order to` → `to`
