@@ -5,19 +5,6 @@
 各スキルは作業を始める前に、対象文書または違反一覧を自分専用の一時記録へ書く。
 一時記録はリポジトリ直下の `.verify-docs/dist/` に置き、ファイル名を次に固定する。
 
-## 保守報告
-
-| 項目 | 値 |
-| --- | --- |
-| 和名 | 保守報告 |
-| 英名 | Maintenance Report |
-| ファイル名 | `maintenance-report.md` |
-| リポジトリ内パス | `.verify-docs/dist/maintenance-report.md` |
-| 配布先パス | `.verify-docs/dist/maintenance-report.md` |
-
-保守報告は、完了した1つの作業単位の実行履歴と最終検査結果を残す恒久記録である。
-導入器は保守報告をコピーせず、各導入先で作成する。
-
 | スキルID | 一時記録 |
 | --- | --- |
 | `verify-docs` | `.verify-docs/dist/verify-docs.work.md` |
@@ -64,6 +51,19 @@ AST の位置情報で修正箇所を特定できるときは、文書全体を1
 - [x] [docs/deploy.md](../../docs/deploy.md) > デプロイ > 独自ドメイン（42行目） — 2026-09-13 /
       [docs/deploy-domain.md](../../docs/deploy-domain.md) へ移動し、元の位置をポインタ化
 ```
+
+## 保守報告
+
+| 項目 | 値 |
+| --- | --- |
+| 和名 | 保守報告 |
+| 英名 | Maintenance Report |
+| ファイル名 | `maintenance-report.md` |
+| リポジトリ内パス | `.verify-docs/dist/maintenance-report.md` |
+| 配布先パス | `.verify-docs/dist/maintenance-report.md` |
+
+保守報告は、完了した1つの作業単位の実行履歴と最終検査結果を残す恒久記録である。
+導入器は保守報告をコピーせず、各導入先で作成する。
 
 ## 保守報告への統合
 

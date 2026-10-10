@@ -1,2 +1,2 @@
 .DS_Store
-.verify-docs/dist/*.work.md
+.verify-docs/dist/*.work.*
