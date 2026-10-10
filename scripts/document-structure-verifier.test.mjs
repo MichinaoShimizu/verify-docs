@@ -350,6 +350,21 @@ test('--baseline reports only violations absent from a saved --json report', () 
   rmSync(root, { recursive: true, force: true });
 });
 
+test('CLI prints usage for --help and rejects unknown arguments', () => {
+  const help = execFileSync('node', [SCRIPT, '--help'], { encoding: 'utf8' });
+  assert.match(help, /^Usage: node scripts\/document-structure-verifier\.mjs/);
+  assert.match(help, /--baseline=<file>/);
+  for (const args of [['--jsno'], ['stray'], ['--root']]) {
+    try {
+      execFileSync('node', [SCRIPT, ...args], { encoding: 'utf8', stdio: 'pipe' });
+      assert.fail(`expected ${args.join(' ')} to be rejected`);
+    } catch (error) {
+      assert.equal(error.status, 2);
+      assert.match(error.stderr, /未対応の引数/);
+    }
+  }
+});
+
 test('uses legacy .claude/skills when .agents/skills is absent', () => {
   const root = makeRepo({
     'README.md': '# Repo\n',

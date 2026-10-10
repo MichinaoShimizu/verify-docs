@@ -76,6 +76,10 @@ export function selectCanonical(left, right) {
 
 function main() {
   const inputPath = process.argv[2];
+  if (inputPath === '--help' || inputPath === '-h') {
+    console.log('Usage: node scripts/select-canonical.mjs <candidate-pair.json>');
+    return 0;
+  }
   if (!inputPath || process.argv.length !== 3) {
     console.error('Usage: node scripts/select-canonical.mjs <candidate-pair.json>');
     return 2;
