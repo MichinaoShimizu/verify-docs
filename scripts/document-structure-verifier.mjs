@@ -104,9 +104,6 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractProseBlocks, markdownText, parseMarkdown, sourcePosition } from './markdown-structure.mjs';
 
-let ROOT;
-let configOption;
-
 export const DEFAULTS = {
   entryPoints: ['README.md', 'CLAUDE.md', 'AGENTS.md'],
   docsDir: 'docs',
@@ -194,10 +191,10 @@ function validateConfig(config) {
   return config;
 }
 
-function loadConfig() {
-  const path = configOption ?? join(ROOT, 'verify-docs.config.json');
+function loadConfig(repoRoot, configPath) {
+  const path = configPath ?? join(repoRoot, 'verify-docs.config.json');
   const detectedSkillsDir = [DEFAULTS.skillsDir, '.claude/skills', '.kiro/skills'].find((dir) =>
-    existsSync(join(ROOT, dir)),
+    existsSync(join(repoRoot, dir)),
   );
   const defaults = detectedSkillsDir
     ? { ...DEFAULTS, skillsDir: detectedSkillsDir }
@@ -210,8 +207,8 @@ function loadConfig() {
   return validateConfig({ ...defaults, ...user });
 }
 
-function loadSizeExceptions(config) {
-  const path = join(ROOT, config.sizeExceptionFile);
+function loadSizeExceptions(repoRoot, config) {
+  const path = join(repoRoot, config.sizeExceptionFile);
   if (!existsSync(path)) return new Map();
   const list = readJson(path, config.sizeExceptionFile);
   if (!Array.isArray(list)) throw new Error(`${config.sizeExceptionFile} は配列である必要があります`);
@@ -257,642 +254,641 @@ function loadSizeExceptions(config) {
 }
 
 export function verifyDocumentStructure(root, { configPath, initSizeExceptions = false, changedBase } = {}) {
-  ROOT = resolve(root);
+  const repoRoot = resolve(root);
   const changed = changedBase === undefined ? null : changedPathsSince(changedBase);
   const changedPaths = changed?.paths ?? null;
-  configOption = configPath;
-  const config = loadConfig();
-  const sizeExceptions = loadSizeExceptions(config);
+  const config = loadConfig(repoRoot, configPath);
+  const sizeExceptions = loadSizeExceptions(repoRoot, config);
 
-/** 実体のない書き方。手順の説明で使うので、パスとしては見ない。 */
-const PLACEHOLDER = /[<>*…]|\.\.\./;
+  /** 実体のない書き方。手順の説明で使うので、パスとしては見ない。 */
+  const PLACEHOLDER = /[<>*…]|\.\.\./;
 
-const violations = [];
-const fail = (kind, from, target, reason, detail = {}) =>
-  violations.push({ kind, from, target, reason, ...detail });
+  const violations = [];
+  const fail = (kind, from, target, reason, detail = {}) =>
+    violations.push({ kind, from, target, reason, ...detail });
 
-/* ---------- 対象の文書を集める ---------- */
+  /* ---------- 対象の文書を集める ---------- */
 
-/* entryPoints・docsDir・skillsDir に置き忘れると検査から漏れてしまうため（本ツール
- * 自体がこれで CONTRIBUTING.md の重複を見逃した）、リポジトリ全体の *.md を対象に
- * 走査する。`excludePaths` に列挙したディレクトリ配下のみ除外する（既定は
- * node_modules・.git・vendor・dist・build）。 */
+  /* entryPoints・docsDir・skillsDir に置き忘れると検査から漏れてしまうため（本ツール
+   * 自体がこれで CONTRIBUTING.md の重複を見逃した）、リポジトリ全体の *.md を対象に
+   * 走査する。`excludePaths` に列挙したディレクトリ配下のみ除外する（既定は
+   * node_modules・.git・vendor・dist・build）。 */
 
-const isExcluded = (relDir) =>
-  config.excludePaths.some((prefix) => `${relDir}/`.startsWith(prefix));
+  const isExcluded = (relDir) =>
+    config.excludePaths.some((prefix) => `${relDir}/`.startsWith(prefix));
 
-function walk(dir, hits = []) {
-  if (!existsSync(dir)) return hits;
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name);
-    const rel = relative(ROOT, full);
-    const info = lstatSync(full);
-    // 互換用の別名を二重走査しない。リンク先の正本側を検査する。
-    if (info.isSymbolicLink()) continue;
-    if (info.isDirectory()) {
-      if (isExcluded(rel)) continue;
-      walk(full, hits);
-    } else if (name.endsWith('.md')) {
-      hits.push(rel);
-    }
-  }
-  return hits;
-}
-
-function changedPathsSince(base) {
-  const output = execFileSync(
-    'git',
-    ['-C', ROOT, 'diff', '--name-status', '-z', '--find-renames', '--diff-filter=ACMRD', `${base}...HEAD`],
-  ).toString('utf8');
-  const fields = output.split('\0');
-  const paths = new Set();
-  const renames = [];
-  for (let index = 0; index < fields.length - 1;) {
-    const status = fields[index++];
-    if (status.startsWith('R') || status.startsWith('C')) {
-      const from = fields[index++];
-      const to = fields[index++];
-      paths.add(from);
-      paths.add(to);
-      if (status.startsWith('R')) renames.push({ from, to });
-      continue;
-    }
-    paths.add(fields[index++]);
-  }
-  return { paths, renames };
-}
-
-const documents = [...new Set(walk(ROOT))].sort();
-const documentSet = new Set(documents);
-
-function sizeExceptionSection(source) {
-  const { headings } = extractProseBlocks(source);
-  if (headings.length === 0) return undefined;
-  // 文書全体を表す先頭の見出しより、分割の単位になりやすい末端節を優先する。
-  const leaves = headings.filter((heading) =>
-    !headings.some((other) =>
-      other.headingPath.length > heading.headingPath.length
-      && other.headingPath.slice(0, heading.headingPath.length).every((part, index) =>
-        part === heading.headingPath[index],
-      ),
-    ),
-  );
-  const section = [...leaves].sort((a, b) => b.bytes - a.bytes || a.sourcepos.start.line - b.sourcepos.start.line)[0];
-  return {
-    headingPath: section.headingPath,
-    startLine: section.sourcepos.start.line,
-    endLine: section.endLine,
-    bytes: section.bytes,
-  };
-}
-
-/* ---------- --init-size-exceptions: 既存リポジトリへの導入 ---------- */
-
-if (initSizeExceptions) {
-  const sizeExceptionPath = join(ROOT, config.sizeExceptionFile);
-  if (existsSync(sizeExceptionPath)) {
-    const error = new Error(`${config.sizeExceptionFile} はすでにある。上書きしない。手で消してからやり直す。`);
-    error.exitCode = 1;
-    throw error;
-  }
-
-  const overSize = documents
-    .map((doc) => ({
-      path: doc,
-      bytes: Buffer.byteLength(readFileSync(join(ROOT, doc), 'utf8'), 'utf8'),
-    }))
-    .filter(({ bytes }) => bytes > config.maxDocBytes)
-    .map(({ path, bytes }) => {
-      const section = sizeExceptionSection(readFileSync(join(ROOT, path), 'utf8'));
-      return {
-        path,
-        reason: `導入時点ですでに上限超過（${bytes} バイト）。分割するかここに理由を書き直す`,
-        ...(section ? { section } : {}),
-      };
-    });
-
-  writeFileSync(sizeExceptionPath, JSON.stringify(overSize, null, 2) + '\n');
-  return { initializedSizeExceptions: { path: config.sizeExceptionFile, count: overSize.length } };
-}
-
-/* ---------- 見出しから断片を作る（GitHub と同じ規則） ---------- */
-
-const slug = (heading) =>
-  heading
-    .trim()
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s_-]/gu, '')
-    .trim()
-    .replace(/\s+/g, '-');
-
-/** コードブロックの中は本文ではないので、見出しもリンクも拾わない。重複検査にも使う。 */
-function stripFences(text) {
-  let inFence = false;
-  return text
-    .split('\n')
-    .map((line) => {
-      if (/^\s*```/.test(line)) {
-        inFence = !inFence;
-        return '';
+  function walk(dir, hits = []) {
+    if (!existsSync(dir)) return hits;
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      const rel = relative(repoRoot, full);
+      const info = lstatSync(full);
+      // 互換用の別名を二重走査しない。リンク先の正本側を検査する。
+      if (info.isSymbolicLink()) continue;
+      if (info.isDirectory()) {
+        if (isExcluded(rel)) continue;
+        walk(full, hits);
+      } else if (name.endsWith('.md')) {
+        hits.push(rel);
       }
-      return inFence ? '' : line;
-    })
-    .join('\n');
-}
-
-const bodies = new Map();
-const sources = new Map();
-const syntaxTrees = new Map();
-const structures = new Map();
-const fragments = new Map();
-
-for (const doc of documents) {
-  const source = readFileSync(join(ROOT, doc), 'utf8');
-  const tree = parseMarkdown(source);
-  sources.set(doc, source);
-  syntaxTrees.set(doc, tree);
-  structures.set(doc, extractProseBlocks(source, { tree }));
-  const body = stripFences(source);
-  bodies.set(doc, body);
-  const ids = new Set();
-  const walker = tree.walker();
-  let event;
-  while ((event = walker.next())) {
-    if (!event.entering || event.node.type !== 'heading') continue;
-    const base = slug(markdownText(event.node));
-    let id = base;
-    let suffix = 1;
-    while (ids.has(id)) id = `${base}-${suffix++}`;
-    ids.add(id);
+    }
+    return hits;
   }
-  fragments.set(doc, ids);
-}
 
-function locationFor(doc, position) {
-  if (!position) return undefined;
-  const heading = structures.get(doc).headings
-    .filter(({ sourcepos }) => sourcepos.start.line <= position.start.line)
-    .at(-1);
-  return {
-    path: doc,
-    ...position,
-    ...(heading ? { headingPath: heading.headingPath } : {}),
-  };
-}
-
-// CommonMark のインラインノード（link / image）は sourcepos を持たないため、
-// 位置を持つ親の段落・見出しまで遡る。
-function nodePosition(node) {
-  for (let current = node; current; current = current.parent) {
-    if (current.sourcepos) return sourcePosition(current);
+  function changedPathsSince(base) {
+    const output = execFileSync(
+      'git',
+      ['-C', repoRoot, 'diff', '--name-status', '-z', '--find-renames', '--diff-filter=ACMRD', `${base}...HEAD`],
+    ).toString('utf8');
+    const fields = output.split('\0');
+    const paths = new Set();
+    const renames = [];
+    for (let index = 0; index < fields.length - 1;) {
+      const status = fields[index++];
+      if (status.startsWith('R') || status.startsWith('C')) {
+        const from = fields[index++];
+        const to = fields[index++];
+        paths.add(from);
+        paths.add(to);
+        if (status.startsWith('R')) renames.push({ from, to });
+        continue;
+      }
+      paths.add(fields[index++]);
+    }
+    return { paths, renames };
   }
-  return undefined;
-}
 
-/* ---------- 1. マークダウンリンクと断片 ---------- */
+  const documents = [...new Set(walk(repoRoot))].sort();
+  const documentSet = new Set(documents);
 
-const referenced = new Set();
-const referencedBy = new Map();
-
-function noteReference(target, from) {
-  const normalized = target.replace(/\/$/, '');
-  if (!documentSet.has(normalized)) return;
-  referenced.add(normalized);
-  if (!referencedBy.has(normalized)) referencedBy.set(normalized, new Set());
-  referencedBy.get(normalized).add(from);
-}
-
-function decodeLinkPart(value) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
+  function sizeExceptionSection(source) {
+    const { headings } = extractProseBlocks(source);
+    if (headings.length === 0) return undefined;
+    // 文書全体を表す先頭の見出しより、分割の単位になりやすい末端節を優先する。
+    const leaves = headings.filter((heading) =>
+      !headings.some((other) =>
+        other.headingPath.length > heading.headingPath.length
+        && other.headingPath.slice(0, heading.headingPath.length).every((part, index) =>
+          part === heading.headingPath[index],
+        ),
+      ),
+    );
+    const section = [...leaves].sort((a, b) => b.bytes - a.bytes || a.sourcepos.start.line - b.sourcepos.start.line)[0];
+    return {
+      headingPath: section.headingPath,
+      startLine: section.sourcepos.start.line,
+      endLine: section.endLine,
+      bytes: section.bytes,
+    };
   }
-}
 
-for (const doc of documents) {
-  const from = dirname(join(ROOT, doc));
-  const walker = syntaxTrees.get(doc).walker();
-  let event;
-  while ((event = walker.next())) {
-    const node = event.node;
-    if (!event.entering || !['link', 'image'].includes(node.type)) continue;
-    const target = node.destination;
-    if (!target || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(target)) continue;
+  /* ---------- --init-size-exceptions: 既存リポジトリへの導入 ---------- */
 
-    const [rawPath, rawFragment] = target.split('#');
-    const path = decodeLinkPart(rawPath);
-    const fragment = rawFragment === undefined ? undefined : decodeLinkPart(rawFragment);
+  if (initSizeExceptions) {
+    const sizeExceptionPath = join(repoRoot, config.sizeExceptionFile);
+    if (existsSync(sizeExceptionPath)) {
+      const error = new Error(`${config.sizeExceptionFile} はすでにある。上書きしない。手で消してからやり直す。`);
+      error.exitCode = 1;
+      throw error;
+    }
 
-    if (path === '') {
-      if (fragment && !fragments.get(doc).has(fragment.toLowerCase())) {
-        fail('fragment', doc, target, `この文書に見出し「${fragment}」がない`, {
+    const overSize = documents
+      .map((doc) => ({
+        path: doc,
+        bytes: Buffer.byteLength(readFileSync(join(repoRoot, doc), 'utf8'), 'utf8'),
+      }))
+      .filter(({ bytes }) => bytes > config.maxDocBytes)
+      .map(({ path, bytes }) => {
+        const section = sizeExceptionSection(readFileSync(join(repoRoot, path), 'utf8'));
+        return {
+          path,
+          reason: `導入時点ですでに上限超過（${bytes} バイト）。分割するかここに理由を書き直す`,
+          ...(section ? { section } : {}),
+        };
+      });
+
+    writeFileSync(sizeExceptionPath, JSON.stringify(overSize, null, 2) + '\n');
+    return { initializedSizeExceptions: { path: config.sizeExceptionFile, count: overSize.length } };
+  }
+
+  /* ---------- 見出しから断片を作る（GitHub と同じ規則） ---------- */
+
+  const slug = (heading) =>
+    heading
+      .trim()
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+      .trim()
+      .replace(/\s+/g, '-');
+
+  /** コードブロックの中は本文ではないので、見出しもリンクも拾わない。重複検査にも使う。 */
+  function stripFences(text) {
+    let inFence = false;
+    return text
+      .split('\n')
+      .map((line) => {
+        if (/^\s*```/.test(line)) {
+          inFence = !inFence;
+          return '';
+        }
+        return inFence ? '' : line;
+      })
+      .join('\n');
+  }
+
+  const bodies = new Map();
+  const sources = new Map();
+  const syntaxTrees = new Map();
+  const structures = new Map();
+  const fragments = new Map();
+
+  for (const doc of documents) {
+    const source = readFileSync(join(repoRoot, doc), 'utf8');
+    const tree = parseMarkdown(source);
+    sources.set(doc, source);
+    syntaxTrees.set(doc, tree);
+    structures.set(doc, extractProseBlocks(source, { tree }));
+    const body = stripFences(source);
+    bodies.set(doc, body);
+    const ids = new Set();
+    const walker = tree.walker();
+    let event;
+    while ((event = walker.next())) {
+      if (!event.entering || event.node.type !== 'heading') continue;
+      const base = slug(markdownText(event.node));
+      let id = base;
+      let suffix = 1;
+      while (ids.has(id)) id = `${base}-${suffix++}`;
+      ids.add(id);
+    }
+    fragments.set(doc, ids);
+  }
+
+  function locationFor(doc, position) {
+    if (!position) return undefined;
+    const heading = structures.get(doc).headings
+      .filter(({ sourcepos }) => sourcepos.start.line <= position.start.line)
+      .at(-1);
+    return {
+      path: doc,
+      ...position,
+      ...(heading ? { headingPath: heading.headingPath } : {}),
+    };
+  }
+
+  // CommonMark のインラインノード（link / image）は sourcepos を持たないため、
+  // 位置を持つ親の段落・見出しまで遡る。
+  function nodePosition(node) {
+    for (let current = node; current; current = current.parent) {
+      if (current.sourcepos) return sourcePosition(current);
+    }
+    return undefined;
+  }
+
+  /* ---------- 1. マークダウンリンクと断片 ---------- */
+
+  const referenced = new Set();
+  const referencedBy = new Map();
+
+  function noteReference(target, from) {
+    const normalized = target.replace(/\/$/, '');
+    if (!documentSet.has(normalized)) return;
+    referenced.add(normalized);
+    if (!referencedBy.has(normalized)) referencedBy.set(normalized, new Set());
+    referencedBy.get(normalized).add(from);
+  }
+
+  function decodeLinkPart(value) {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  for (const doc of documents) {
+    const from = dirname(join(repoRoot, doc));
+    const walker = syntaxTrees.get(doc).walker();
+    let event;
+    while ((event = walker.next())) {
+      const node = event.node;
+      if (!event.entering || !['link', 'image'].includes(node.type)) continue;
+      const target = node.destination;
+      if (!target || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(target)) continue;
+
+      const [rawPath, rawFragment] = target.split('#');
+      const path = decodeLinkPart(rawPath);
+      const fragment = rawFragment === undefined ? undefined : decodeLinkPart(rawFragment);
+
+      if (path === '') {
+        if (fragment && !fragments.get(doc).has(fragment.toLowerCase())) {
+          fail('fragment', doc, target, `この文書に見出し「${fragment}」がない`, {
+            location: locationFor(doc, nodePosition(node)),
+          });
+        }
+        continue;
+      }
+
+      const full = resolve(from, path);
+      if (!existsSync(full)) {
+        fail('link', doc, target, '飛び先のファイルがない', {
+          location: locationFor(doc, nodePosition(node)),
+        });
+        continue;
+      }
+      noteReference(relative(repoRoot, full), doc);
+
+      if (!fragment) continue;
+      const targetDoc = relative(repoRoot, full);
+      if (!fragments.has(targetDoc)) continue;
+      if (!fragments.get(targetDoc).has(fragment.toLowerCase())) {
+        fail('fragment', doc, target, `${targetDoc} に見出し「${fragment}」がない`, {
           location: locationFor(doc, nodePosition(node)),
         });
       }
-      continue;
-    }
-
-    const full = resolve(from, path);
-    if (!existsSync(full)) {
-      fail('link', doc, target, '飛び先のファイルがない', {
-        location: locationFor(doc, nodePosition(node)),
-      });
-      continue;
-    }
-    noteReference(relative(ROOT, full), doc);
-
-    if (!fragment) continue;
-    const targetDoc = relative(ROOT, full);
-    if (!fragments.has(targetDoc)) continue;
-    if (!fragments.get(targetDoc).has(fragment.toLowerCase())) {
-      fail('fragment', doc, target, `${targetDoc} に見出し「${fragment}」がない`, {
-        location: locationFor(doc, nodePosition(node)),
-      });
     }
   }
-}
 
-/* ---------- 2. バッククォートで書いたパス ---------- */
+  /* ---------- 2. バッククォートで書いたパス ---------- */
 
-for (const doc of documents) {
-  for (const [, token] of bodies.get(doc).matchAll(/`([^`\n]+)`/g)) {
-    const path = token.trim().replace(/[、。）)]+$/, '');
-    if (!config.pathRoots.some((root) => path.startsWith(root))) continue;
-    if (PLACEHOLDER.test(path)) continue;
+  for (const doc of documents) {
+    for (const [, token] of bodies.get(doc).matchAll(/`([^`\n]+)`/g)) {
+      const path = token.trim().replace(/[、。）)]+$/, '');
+      if (!config.pathRoots.some((root) => path.startsWith(root))) continue;
+      if (PLACEHOLDER.test(path)) continue;
 
-    if (!existsSync(join(ROOT, path.replace(/\/$/, '')))) {
-      fail('path', doc, path, 'この場所にファイルもディレクトリもない');
-      continue;
-    }
-    noteReference(path, doc);
-  }
-}
-
-/* ---------- 3. 孤立した文書 ---------- */
-
-const skillDoc = (doc) => {
-  const prefix = `${config.skillsDir}/`;
-  if (!doc.startsWith(prefix)) return null;
-  const rest = doc.slice(prefix.length);
-  const slash = rest.indexOf('/');
-  if (slash === -1) return null;
-  return [rest.slice(0, slash), rest.slice(slash + 1)];
-};
-
-/* SKILL.md → 補助文書 A → 補助文書 B のように段階的に開示する構成を許すため、
- * 補助文書は自分の SKILL.md から同じスキル内の文書をたどって到達できればよい。 */
-const reachableFromSkill = new Map();
-for (const doc of documents) {
-  const skill = skillDoc(doc);
-  if (!skill || skill[1] !== 'SKILL.md') continue;
-  const reached = new Set([doc]);
-  const skillPrefix = `${config.skillsDir}/${skill[0]}/`;
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const candidate of documents) {
-      if (reached.has(candidate) || !candidate.startsWith(skillPrefix)) continue;
-      if ([...(referencedBy.get(candidate) ?? [])].some((from) => reached.has(from))) {
-        reached.add(candidate);
-        grew = true;
+      if (!existsSync(join(repoRoot, path.replace(/\/$/, '')))) {
+        fail('path', doc, path, 'この場所にファイルもディレクトリもない');
+        continue;
       }
+      noteReference(path, doc);
     }
   }
-  reachableFromSkill.set(doc, reached);
-}
 
-for (const doc of documents) {
-  if (config.entryPoints.includes(doc)) continue;
+  /* ---------- 3. 孤立した文書 ---------- */
 
-  const skill = skillDoc(doc);
-  if (skill) {
-    const [name, rest] = skill;
-    if (rest === 'SKILL.md') continue;
-    const owner = `${config.skillsDir}/${name}/SKILL.md`;
-    if (reachableFromSkill.get(owner)?.has(doc)) continue;
-    fail('orphan', doc, doc, `${owner} からたどれない（SKILL.md の目次か、そこから参照される補助文書に載せる）`);
-    continue;
-  }
+  const skillDoc = (doc) => {
+    const prefix = `${config.skillsDir}/`;
+    if (!doc.startsWith(prefix)) return null;
+    const rest = doc.slice(prefix.length);
+    const slash = rest.indexOf('/');
+    if (slash === -1) return null;
+    return [rest.slice(0, slash), rest.slice(slash + 1)];
+  };
 
-  if (config.agentConfigDirs.some((dir) => doc.startsWith(`${dir.replace(/\/$/, '')}/`))) {
-    // エージェント設定ディレクトリ配下の SKILL.md 以外の設定ファイルなどは対象外
-    if (!doc.startsWith(config.docsDir)) continue;
-  }
-  if (referenced.has(doc)) continue;
-  fail('orphan', doc, doc, 'どの文書からも参照されていない（README か関連する文書から指す）');
-}
-
-/* ---------- 4. 文書のサイズ ---------- */
-
-for (const doc of documents) {
-  const bytes = Buffer.byteLength(readFileSync(join(ROOT, doc), 'utf8'), 'utf8');
-  const exempt = sizeExceptions.get(doc);
-
-  if (bytes > config.maxDocBytes && !exempt) {
-    const sections = structures.get(doc).headings
-      .filter(({ headingPath }) => headingPath.length > 1)
-      .sort((a, b) => b.bytes - a.bytes || a.sourcepos.start.line - b.sourcepos.start.line)
-      .slice(0, 3)
-      .map(({ headingPath, sourcepos, endLine, bytes: sectionBytes }) => ({
-        headingPath,
-        startLine: sourcepos.start.line,
-        endLine,
-        bytes: sectionBytes,
-      }));
-    fail(
-      'size',
-      doc,
-      doc,
-      `${bytes} バイト（上限 ${config.maxDocBytes}）。話題ごとに分けて互いにリンクするか、` +
-        `${config.sizeExceptionFile} に理由つきで書いて明示的に借金にする`,
-      { bytes, limit: config.maxDocBytes, sections },
-    );
-  }
-
-  if (exempt && bytes <= config.maxDocBytes) {
-    fail(
-      'stale-size-exception',
-      config.sizeExceptionFile,
-      doc,
-      `もう上限内に収まっている（${bytes} バイト）。${config.sizeExceptionFile} から消す`,
-    );
-  }
-}
-
-for (const path of sizeExceptions.keys()) {
-  if (!documentSet.has(path)) {
-    fail('stale-size-exception', config.sizeExceptionFile, path, 'この文書がもう無い。エントリを消す');
-  }
-}
-
-/* ---------- 5. 文書間の重複 ---------- */
-
-/* コピーしてから片方だけ直すと、矛盾した説明が残る。ASTから抽出した段落本文が
- * 完全一致する組（強調などの書式差は無視）を見つけ、1か所にまとめるよう促す。
- * 短い共通の言い回しまで拾うと誤検知だらけになるので、`minDuplicateChars` 未満の
- * 段落・見出し・表の行は見ない。 */
-
-const ALLOW_MARKER = '<!-- verify-docs:allow-duplicate -->';
-
-/* スキルは単体で配布できるよう、同じ補助文書を各スキルの references/ へ複製する。
- * 内容が完全に同じ複製は最初の1つだけを比較対象にする。内容がずれた複製は
- * 通常どおり重複として報告する。 */
-const referenceReplicas = new Set();
-{
-  const seen = new Set();
+  /* SKILL.md → 補助文書 A → 補助文書 B のように段階的に開示する構成を許すため、
+   * 補助文書は自分の SKILL.md から同じスキル内の文書をたどって到達できればよい。 */
+  const reachableFromSkill = new Map();
   for (const doc of documents) {
     const skill = skillDoc(doc);
-    if (!skill || !skill[1].startsWith('references/')) continue;
-    const identity = JSON.stringify([skill[1], sources.get(doc)]);
-    if (seen.has(identity)) referenceReplicas.add(doc);
-    else seen.add(identity);
-  }
-}
-
-/** 見出し・表・意図した重複（allow-duplicate）を除いた、比較対象の段落だけを集める。 */
-function collectParagraphs() {
-  const hits = [];
-  for (const doc of documents) {
-    if (referenceReplicas.has(doc)) continue;
-    const source = sources.get(doc);
-    const lines = source.split(/\r?\n/);
-    const { blocks } = extractProseBlocks(source, {
-      includeSignatures: true,
-      tree: syntaxTrees.get(doc),
-    });
-    for (const block of blocks) {
-      if (block.source.trimStart().startsWith('|')) continue;
-
-      let previousLine = block.sourcepos.start.line - 2;
-      while (previousLine >= 0 && lines[previousLine].trim() === '') previousLine--;
-      if (previousLine >= 0 && lines[previousLine].trim() === ALLOW_MARKER) continue;
-
-      const normalized = block.text.replace(/\s+/g, ' ').trim();
-      if (normalized.length < config.minDuplicateChars) continue;
-
-      hits.push({ doc, normalized, signature: block.signature, block });
+    if (!skill || skill[1] !== 'SKILL.md') continue;
+    const reached = new Set([doc]);
+    const skillPrefix = `${config.skillsDir}/${skill[0]}/`;
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const candidate of documents) {
+        if (reached.has(candidate) || !candidate.startsWith(skillPrefix)) continue;
+        if ([...(referencedBy.get(candidate) ?? [])].some((from) => reached.has(from))) {
+          reached.add(candidate);
+          grew = true;
+        }
+      }
     }
-  }
-  return hits;
-}
-
-const paragraphs = config.checkDuplicates || config.checkNearDuplicates ? collectParagraphs() : [];
-
-if (config.checkDuplicates) {
-  const paragraphGroups = new Map();
-  for (const { doc, normalized, signature, block } of paragraphs) {
-    const identity = JSON.stringify([normalized, signature]);
-    if (!paragraphGroups.has(identity)) paragraphGroups.set(identity, { normalized, occurrences: [] });
-    paragraphGroups.get(identity).occurrences.push({ doc, block });
+    reachableFromSkill.set(doc, reached);
   }
 
-  for (const { normalized, occurrences } of paragraphGroups.values()) {
-    const uniqueDocs = [...new Set(occurrences.map(({ doc }) => doc))].sort();
-    if (uniqueDocs.length < 2) continue;
-    const [first, ...rest] = uniqueDocs;
-    const snippet = normalized.length > 50 ? `${normalized.slice(0, 50)}…` : normalized;
-    const firstOccurrence = occurrences.find(({ doc }) => doc === first);
-    fail(
-      'duplicate',
-      first,
-      rest.join(', '),
-      `同じ説明が重複している（「${snippet}」）。1か所にまとめて他方からリンクする。` +
-        `意図した重複なら段落の前に ${ALLOW_MARKER} を置く`,
-      {
-        location: locationFor(first, firstOccurrence.block.sourcepos),
-        occurrences: occurrences.map(({ doc, block }) => ({
-          location: locationFor(doc, block.sourcepos),
-        })),
-      },
-    );
-  }
-}
+  for (const doc of documents) {
+    if (config.entryPoints.includes(doc)) continue;
 
-/* ---------- 5b. 準一致重複（句読点・敬体/常体レベルの表記ゆれ） ---------- */
+    const skill = skillDoc(doc);
+    if (skill) {
+      const [name, rest] = skill;
+      if (rest === 'SKILL.md') continue;
+      const owner = `${config.skillsDir}/${name}/SKILL.md`;
+      if (reachableFromSkill.get(owner)?.has(doc)) continue;
+      fail('orphan', doc, doc, `${owner} からたどれない（SKILL.md の目次か、そこから参照される補助文書に載せる）`);
+      continue;
+    }
 
-/* 完全一致より緩めると誤検知が増えるので、既定オフ（config.checkNearDuplicates）。
- * 吸収するのは「句読点の全角/半角」と「代表的な敬体/常体の語尾」だけで、
- * 意味的な類似判定（embedding など）はしない。完全一致で既に拾える組は
- * 二重報告しない（texts.size >= 2 のときだけ「表記ゆれで一致した」とみなす）。 */
-
-const STYLE_ENDINGS = [
-  [/ではありません/g, 'ではない'],
-  [/ございます/g, 'ある'],
-  [/でした/g, 'だった'],
-  [/でしょう/g, 'だろう'],
-  [/ましょう/g, 'よう'],
-  [/ません/g, 'ない'],
-  [/します/g, 'する'],
-  [/です/g, 'だ'],
-  [/ます/g, 'る'],
-];
-
-function fuzzyNormalize(text) {
-  let s = text;
-  for (const [pattern, replacement] of STYLE_ENDINGS) s = s.replace(pattern, replacement);
-  return s
-    .replace(/[，,]/g, '、')
-    .replace(/[．.]/g, '。')
-    .replace(/[！!]/g, '!')
-    .replace(/[？?]/g, '?')
-    .replace(/\s+/g, '');
-}
-
-if (config.checkNearDuplicates) {
-  const fuzzyGroups = new Map();
-  for (const { doc, normalized, signature, block } of paragraphs) {
-    const fuzzy = fuzzyNormalize(normalized);
-    if (fuzzy.length < config.minDuplicateChars) continue;
-
-    const identity = JSON.stringify([fuzzy, signature]);
-    if (!fuzzyGroups.has(identity)) fuzzyGroups.set(identity, { texts: new Set(), docs: new Map() });
-    const group = fuzzyGroups.get(identity);
-    group.texts.add(normalized);
-    if (!group.docs.has(doc)) group.docs.set(doc, { normalized, block });
+    if (config.agentConfigDirs.some((dir) => doc.startsWith(`${dir.replace(/\/$/, '')}/`))) {
+      // エージェント設定ディレクトリ配下の SKILL.md 以外の設定ファイルなどは対象外
+      if (!doc.startsWith(config.docsDir)) continue;
+    }
+    if (referenced.has(doc)) continue;
+    fail('orphan', doc, doc, 'どの文書からも参照されていない（README か関連する文書から指す）');
   }
 
-  for (const [fuzzy, group] of fuzzyGroups) {
-    if (group.docs.size < 2) continue;
-    if (group.texts.size < 2) continue; // 完全一致（5.）で既に報告済み
+  /* ---------- 4. 文書のサイズ ---------- */
 
-    const [first, ...rest] = [...group.docs.keys()].sort();
-    const snippet = fuzzy.length > 50 ? `${fuzzy.slice(0, 50)}…` : fuzzy;
-    fail(
-      'near-duplicate',
-      first,
-      rest.join(', '),
-      `句読点・敬体/常体だけが違う、ほぼ同じ説明が複数の文書にある（正規化後: 「${snippet}」）。` +
-        `1か所にまとめて他方からリンクするか、意図した表記差なら段落の前に ${ALLOW_MARKER} を置く`,
-      { location: locationFor(first, group.docs.get(first).block.sourcepos) },
-    );
-  }
-}
+  for (const doc of documents) {
+    const bytes = Buffer.byteLength(readFileSync(join(repoRoot, doc), 'utf8'), 'utf8');
+    const exempt = sizeExceptions.get(doc);
 
-/* ---------- 報告 ---------- */
+    if (bytes > config.maxDocBytes && !exempt) {
+      const sections = structures.get(doc).headings
+        .filter(({ headingPath }) => headingPath.length > 1)
+        .sort((a, b) => b.bytes - a.bytes || a.sourcepos.start.line - b.sourcepos.start.line)
+        .slice(0, 3)
+        .map(({ headingPath, sourcepos, endLine, bytes: sectionBytes }) => ({
+          headingPath,
+          startLine: sourcepos.start.line,
+          endLine,
+          bytes: sectionBytes,
+        }));
+      fail(
+        'size',
+        doc,
+        doc,
+        `${bytes} バイト（上限 ${config.maxDocBytes}）。話題ごとに分けて互いにリンクするか、` +
+          `${config.sizeExceptionFile} に理由つきで書いて明示的に借金にする`,
+        { bytes, limit: config.maxDocBytes, sections },
+      );
+    }
 
-const documentMetrics = [...structures.entries()].map(([path, structure]) => ({
-  path,
-  bytes: structure.bytes,
-  headings: structure.headings.length,
-  paragraphs: structure.blocks.length,
-}));
-const leafSections = [...structures.entries()].flatMap(([path, structure]) => {
-  const headings = structure.headings;
-  return headings.flatMap((heading, index) => {
-    if (headings[index + 1]?.level > heading.level) return [];
-    return [{
-      path,
-      headingPath: heading.headingPath,
-      startLine: heading.sourcepos.start.line,
-      endLine: heading.endLine,
-      bytes: heading.bytes,
-      paragraphCount: heading.paragraphCount,
-    }];
-  });
-});
-const changedScopeIncludesEverything = changedPaths?.has('verify-docs.config.json') || changedPaths?.has(config.sizeExceptionFile);
-function violationTouchesChangedPath(violation) {
-  if (!changedPaths || changedScopeIncludesEverything) return true;
-  const paths = [violation.from, violation.target, violation.location?.path];
-  for (const occurrence of violation.occurrences ?? []) paths.push(occurrence.location?.path);
-  return paths.filter(Boolean).some((path) => changedPaths.has(path.split('#', 1)[0]));
-}
-const scopedViolations = violations.filter(violationTouchesChangedPath);
-const violationsByKind = Object.fromEntries(
-  [...new Set(scopedViolations.map(({ kind }) => kind))]
-    .sort()
-    .map((kind) => [kind, scopedViolations.filter((violation) => violation.kind === kind).length]),
-);
-const summary = {
-  documents: {
-    count: documentMetrics.length,
-    bytes: documentMetrics.reduce((sum, document) => sum + document.bytes, 0),
-    headings: documentMetrics.reduce((sum, document) => sum + document.headings, 0),
-    paragraphs: documentMetrics.reduce((sum, document) => sum + document.paragraphs, 0),
-  },
-  sizeExceptions: {
-    count: sizeExceptions.size,
-    entries: [...sizeExceptions.values()],
-  },
-  violations: {
-    count: scopedViolations.length,
-    byKind: violationsByKind,
-  },
-  largestSections: leafSections
-    .sort((a, b) => b.bytes - a.bytes || a.path.localeCompare(b.path) || a.startLine - b.startLine)
-    .slice(0, 5),
-};
-
-const verificationReport = {
-  kind: 'DocumentStructureVerificationReport',
-  summary,
-  violations: scopedViolations,
-  ...(changedPaths ? {
-    changed: {
-      base: changedBase,
-      paths: [...changedPaths].sort(),
-      ...(changed.renames.length ? { renames: changed.renames } : {}),
-    },
-  } : {}),
-};
-
-return verificationReport;
-}
-
-export function printVerificationReport(verificationReport, { json = false } = {}) {
-if (json) {
-  console.log(JSON.stringify(verificationReport, null, 2));
-} else {
-  const { summary, violations } = verificationReport;
-  const label = {
-    link: 'リンク切れ',
-    fragment: '断片',
-    path: 'パス参照',
-    orphan: '孤立',
-    size: 'サイズ超過',
-    duplicate: '重複',
-    'near-duplicate': '準一致重複',
-    'stale-size-exception': '文書サイズ例外の掃除',
-  };
-  console.log(
-    `文書 ${summary.documents.count} 件（見出し ${summary.documents.headings} 件・` +
-    `段落 ${summary.documents.paragraphs} 件・${summary.documents.bytes} バイト、文書サイズ例外 ${summary.sizeExceptions.count} 件）を検査`,
-  );
-  if (summary.largestSections.length > 0) {
-    console.log('\n大きい節（末端節・上位5件）:');
-    for (const section of summary.largestSections) {
-      console.log(
-        `  - ${section.path}:${section.startLine}-${section.endLine} / ` +
-        `${section.headingPath.join(' > ')} — ${section.bytes} バイト、${section.paragraphCount} 段落`,
+    if (exempt && bytes <= config.maxDocBytes) {
+      fail(
+        'stale-size-exception',
+        config.sizeExceptionFile,
+        doc,
+        `もう上限内に収まっている（${bytes} バイト）。${config.sizeExceptionFile} から消す`,
       );
     }
   }
-  if (summary.sizeExceptions.entries.length > 0) {
-    console.log('\n文書サイズ例外:');
-    for (const entry of summary.sizeExceptions.entries) {
-      const section = entry.section
-        ? ` / ${entry.section.headingPath.join(' > ')} (${entry.section.startLine}-${entry.section.endLine}行、${entry.section.bytes} バイト)`
-        : '';
-      console.log(`  - ${entry.path}${section} — ${entry.reason}`);
+
+  for (const path of sizeExceptions.keys()) {
+    if (!documentSet.has(path)) {
+      fail('stale-size-exception', config.sizeExceptionFile, path, 'この文書がもう無い。エントリを消す');
     }
   }
-  if (violations.length > 0) {
-    const kinds = Object.entries(summary.violations.byKind)
-      .map(([kind, count]) => `${label[kind]} ${count}件`)
-      .join('・');
-    console.error(`\n文書構造の検査に失敗（${violations.length}件: ${kinds}）:`);
-    for (const f of violations) {
-      const where = f.location
-        ? ` (${f.location.path}:${f.location.start.line}:${f.location.start.column}` +
-          `${f.location.headingPath?.length ? ` / ${f.location.headingPath.join(' > ')}` : ''})`
-        : '';
-      console.error(`  - [${label[f.kind]}] ${f.from} → ${f.target}${where} — ${f.reason}`);
+
+  /* ---------- 5. 文書間の重複 ---------- */
+
+  /* コピーしてから片方だけ直すと、矛盾した説明が残る。ASTから抽出した段落本文が
+   * 完全一致する組（強調などの書式差は無視）を見つけ、1か所にまとめるよう促す。
+   * 短い共通の言い回しまで拾うと誤検知だらけになるので、`minDuplicateChars` 未満の
+   * 段落・見出し・表の行は見ない。 */
+
+  const ALLOW_MARKER = '<!-- verify-docs:allow-duplicate -->';
+
+  /* スキルは単体で配布できるよう、同じ補助文書を各スキルの references/ へ複製する。
+   * 内容が完全に同じ複製は最初の1つだけを比較対象にする。内容がずれた複製は
+   * 通常どおり重複として報告する。 */
+  const referenceReplicas = new Set();
+  {
+    const seen = new Set();
+    for (const doc of documents) {
+      const skill = skillDoc(doc);
+      if (!skill || !skill[1].startsWith('references/')) continue;
+      const identity = JSON.stringify([skill[1], sources.get(doc)]);
+      if (seen.has(identity)) referenceReplicas.add(doc);
+      else seen.add(identity);
     }
-  } else {
-    console.log('\n文書構造: すべて通過');
   }
+
+  /** 見出し・表・意図した重複（allow-duplicate）を除いた、比較対象の段落だけを集める。 */
+  function collectParagraphs() {
+    const hits = [];
+    for (const doc of documents) {
+      if (referenceReplicas.has(doc)) continue;
+      const source = sources.get(doc);
+      const lines = source.split(/\r?\n/);
+      const { blocks } = extractProseBlocks(source, {
+        includeSignatures: true,
+        tree: syntaxTrees.get(doc),
+      });
+      for (const block of blocks) {
+        if (block.source.trimStart().startsWith('|')) continue;
+
+        let previousLine = block.sourcepos.start.line - 2;
+        while (previousLine >= 0 && lines[previousLine].trim() === '') previousLine--;
+        if (previousLine >= 0 && lines[previousLine].trim() === ALLOW_MARKER) continue;
+
+        const normalized = block.text.replace(/\s+/g, ' ').trim();
+        if (normalized.length < config.minDuplicateChars) continue;
+
+        hits.push({ doc, normalized, signature: block.signature, block });
+      }
+    }
+    return hits;
+  }
+
+  const paragraphs = config.checkDuplicates || config.checkNearDuplicates ? collectParagraphs() : [];
+
+  if (config.checkDuplicates) {
+    const paragraphGroups = new Map();
+    for (const { doc, normalized, signature, block } of paragraphs) {
+      const identity = JSON.stringify([normalized, signature]);
+      if (!paragraphGroups.has(identity)) paragraphGroups.set(identity, { normalized, occurrences: [] });
+      paragraphGroups.get(identity).occurrences.push({ doc, block });
+    }
+
+    for (const { normalized, occurrences } of paragraphGroups.values()) {
+      const uniqueDocs = [...new Set(occurrences.map(({ doc }) => doc))].sort();
+      if (uniqueDocs.length < 2) continue;
+      const [first, ...rest] = uniqueDocs;
+      const snippet = normalized.length > 50 ? `${normalized.slice(0, 50)}…` : normalized;
+      const firstOccurrence = occurrences.find(({ doc }) => doc === first);
+      fail(
+        'duplicate',
+        first,
+        rest.join(', '),
+        `同じ説明が重複している（「${snippet}」）。1か所にまとめて他方からリンクする。` +
+          `意図した重複なら段落の前に ${ALLOW_MARKER} を置く`,
+        {
+          location: locationFor(first, firstOccurrence.block.sourcepos),
+          occurrences: occurrences.map(({ doc, block }) => ({
+            location: locationFor(doc, block.sourcepos),
+          })),
+        },
+      );
+    }
+  }
+
+  /* ---------- 5b. 準一致重複（句読点・敬体/常体レベルの表記ゆれ） ---------- */
+
+  /* 完全一致より緩めると誤検知が増えるので、既定オフ（config.checkNearDuplicates）。
+   * 吸収するのは「句読点の全角/半角」と「代表的な敬体/常体の語尾」だけで、
+   * 意味的な類似判定（embedding など）はしない。完全一致で既に拾える組は
+   * 二重報告しない（texts.size >= 2 のときだけ「表記ゆれで一致した」とみなす）。 */
+
+  const STYLE_ENDINGS = [
+    [/ではありません/g, 'ではない'],
+    [/ございます/g, 'ある'],
+    [/でした/g, 'だった'],
+    [/でしょう/g, 'だろう'],
+    [/ましょう/g, 'よう'],
+    [/ません/g, 'ない'],
+    [/します/g, 'する'],
+    [/です/g, 'だ'],
+    [/ます/g, 'る'],
+  ];
+
+  function fuzzyNormalize(text) {
+    let s = text;
+    for (const [pattern, replacement] of STYLE_ENDINGS) s = s.replace(pattern, replacement);
+    return s
+      .replace(/[，,]/g, '、')
+      .replace(/[．.]/g, '。')
+      .replace(/[！!]/g, '!')
+      .replace(/[？?]/g, '?')
+      .replace(/\s+/g, '');
+  }
+
+  if (config.checkNearDuplicates) {
+    const fuzzyGroups = new Map();
+    for (const { doc, normalized, signature, block } of paragraphs) {
+      const fuzzy = fuzzyNormalize(normalized);
+      if (fuzzy.length < config.minDuplicateChars) continue;
+
+      const identity = JSON.stringify([fuzzy, signature]);
+      if (!fuzzyGroups.has(identity)) fuzzyGroups.set(identity, { texts: new Set(), docs: new Map() });
+      const group = fuzzyGroups.get(identity);
+      group.texts.add(normalized);
+      if (!group.docs.has(doc)) group.docs.set(doc, { normalized, block });
+    }
+
+    for (const [fuzzy, group] of fuzzyGroups) {
+      if (group.docs.size < 2) continue;
+      if (group.texts.size < 2) continue; // 完全一致（5.）で既に報告済み
+
+      const [first, ...rest] = [...group.docs.keys()].sort();
+      const snippet = fuzzy.length > 50 ? `${fuzzy.slice(0, 50)}…` : fuzzy;
+      fail(
+        'near-duplicate',
+        first,
+        rest.join(', '),
+        `句読点・敬体/常体だけが違う、ほぼ同じ説明が複数の文書にある（正規化後: 「${snippet}」）。` +
+          `1か所にまとめて他方からリンクするか、意図した表記差なら段落の前に ${ALLOW_MARKER} を置く`,
+        { location: locationFor(first, group.docs.get(first).block.sourcepos) },
+      );
+    }
+  }
+
+  /* ---------- 報告 ---------- */
+
+  const documentMetrics = [...structures.entries()].map(([path, structure]) => ({
+    path,
+    bytes: structure.bytes,
+    headings: structure.headings.length,
+    paragraphs: structure.blocks.length,
+  }));
+  const leafSections = [...structures.entries()].flatMap(([path, structure]) => {
+    const headings = structure.headings;
+    return headings.flatMap((heading, index) => {
+      if (headings[index + 1]?.level > heading.level) return [];
+      return [{
+        path,
+        headingPath: heading.headingPath,
+        startLine: heading.sourcepos.start.line,
+        endLine: heading.endLine,
+        bytes: heading.bytes,
+        paragraphCount: heading.paragraphCount,
+      }];
+    });
+  });
+  const changedScopeIncludesEverything = changedPaths?.has('verify-docs.config.json') || changedPaths?.has(config.sizeExceptionFile);
+  function violationTouchesChangedPath(violation) {
+    if (!changedPaths || changedScopeIncludesEverything) return true;
+    const paths = [violation.from, violation.target, violation.location?.path];
+    for (const occurrence of violation.occurrences ?? []) paths.push(occurrence.location?.path);
+    return paths.filter(Boolean).some((path) => changedPaths.has(path.split('#', 1)[0]));
+  }
+  const scopedViolations = violations.filter(violationTouchesChangedPath);
+  const violationsByKind = Object.fromEntries(
+    [...new Set(scopedViolations.map(({ kind }) => kind))]
+      .sort()
+      .map((kind) => [kind, scopedViolations.filter((violation) => violation.kind === kind).length]),
+  );
+  const summary = {
+    documents: {
+      count: documentMetrics.length,
+      bytes: documentMetrics.reduce((sum, document) => sum + document.bytes, 0),
+      headings: documentMetrics.reduce((sum, document) => sum + document.headings, 0),
+      paragraphs: documentMetrics.reduce((sum, document) => sum + document.paragraphs, 0),
+    },
+    sizeExceptions: {
+      count: sizeExceptions.size,
+      entries: [...sizeExceptions.values()],
+    },
+    violations: {
+      count: scopedViolations.length,
+      byKind: violationsByKind,
+    },
+    largestSections: leafSections
+      .sort((a, b) => b.bytes - a.bytes || a.path.localeCompare(b.path) || a.startLine - b.startLine)
+      .slice(0, 5),
+  };
+
+  const verificationReport = {
+    kind: 'DocumentStructureVerificationReport',
+    summary,
+    violations: scopedViolations,
+    ...(changedPaths ? {
+      changed: {
+        base: changedBase,
+        paths: [...changedPaths].sort(),
+        ...(changed.renames.length ? { renames: changed.renames } : {}),
+      },
+    } : {}),
+  };
+
+  return verificationReport;
 }
+
+export function printVerificationReport(verificationReport, { json = false } = {}) {
+  if (json) {
+    console.log(JSON.stringify(verificationReport, null, 2));
+  } else {
+    const { summary, violations } = verificationReport;
+    const label = {
+      link: 'リンク切れ',
+      fragment: '断片',
+      path: 'パス参照',
+      orphan: '孤立',
+      size: 'サイズ超過',
+      duplicate: '重複',
+      'near-duplicate': '準一致重複',
+      'stale-size-exception': '文書サイズ例外の掃除',
+    };
+    console.log(
+      `文書 ${summary.documents.count} 件（見出し ${summary.documents.headings} 件・` +
+      `段落 ${summary.documents.paragraphs} 件・${summary.documents.bytes} バイト、文書サイズ例外 ${summary.sizeExceptions.count} 件）を検査`,
+    );
+    if (summary.largestSections.length > 0) {
+      console.log('\n大きい節（末端節・上位5件）:');
+      for (const section of summary.largestSections) {
+        console.log(
+          `  - ${section.path}:${section.startLine}-${section.endLine} / ` +
+          `${section.headingPath.join(' > ')} — ${section.bytes} バイト、${section.paragraphCount} 段落`,
+        );
+      }
+    }
+    if (summary.sizeExceptions.entries.length > 0) {
+      console.log('\n文書サイズ例外:');
+      for (const entry of summary.sizeExceptions.entries) {
+        const section = entry.section
+          ? ` / ${entry.section.headingPath.join(' > ')} (${entry.section.startLine}-${entry.section.endLine}行、${entry.section.bytes} バイト)`
+          : '';
+        console.log(`  - ${entry.path}${section} — ${entry.reason}`);
+      }
+    }
+    if (violations.length > 0) {
+      const kinds = Object.entries(summary.violations.byKind)
+        .map(([kind, count]) => `${label[kind]} ${count}件`)
+        .join('・');
+      console.error(`\n文書構造の検査に失敗（${violations.length}件: ${kinds}）:`);
+      for (const f of violations) {
+        const where = f.location
+          ? ` (${f.location.path}:${f.location.start.line}:${f.location.start.column}` +
+            `${f.location.headingPath?.length ? ` / ${f.location.headingPath.join(' > ')}` : ''})`
+          : '';
+        console.error(`  - [${label[f.kind]}] ${f.from} → ${f.target}${where} — ${f.reason}`);
+      }
+    } else {
+      console.log('\n文書構造: すべて通過');
+    }
+  }
 }
 
 function main() {
