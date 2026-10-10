@@ -460,6 +460,34 @@ test('skill references reachable through other references of the same skill are 
   rmSync(root, { recursive: true, force: true });
 });
 
+test('explicit heading IDs ({#id} and {/* #id */}) are fragment targets', () => {
+  const root = makeRepo({
+    'README.md': '# Repo\n\n[a](docs/a.md#custom) [b](docs/a.md#addRoute) [c](docs/a.md#plain-title) [d](docs/a.md#gone) [e](docs/a.md#StepOne)\n',
+    'docs/a.md': '# A\n\n## Classic title {#custom}\n\n## `addRoute()` {/* #addRoute */}\n\n## Plain title\n\n<a id="StepOne"></a>\n',
+  });
+  assert.deepEqual(run(root).violations.map((f) => f.target), ['docs/a.md#gone']);
+  rmSync(root, { recursive: true, force: true });
+});
+
+test('extensions adds MDX documents to every check', () => {
+  const files = {
+    'README.md': '# Repo\n\n[guide](docs/guide.mdx)\n',
+    'docs/guide.mdx': '# Guide\n\nimport Tabs from "@theme/Tabs";\n\n[missing](missing.mdx)\n',
+    'docs/lonely.mdx': '# Lonely\n',
+  };
+  const plain = makeRepo(files);
+  assert.deepEqual(run(plain).violations, []);
+  const root = makeRepo({ ...files, 'verify-docs.config.json': JSON.stringify({ extensions: ['.md', '.mdx'] }) });
+  assert.deepEqual(run(root).violations.map(({ kind, from, target }) => [kind, from, target]), [
+    ['link', 'docs/guide.mdx', 'missing.mdx'],
+    ['orphan', 'docs/lonely.mdx', 'docs/lonely.mdx'],
+  ]);
+  writeFileSync(join(root, 'verify-docs.config.json'), JSON.stringify({ extensions: ['mdx'] }));
+  assert.throws(() => run(root), /extensions は ".md" のような拡張子/);
+  rmSync(plain, { recursive: true, force: true });
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('orphanExemptPaths exempts only the orphan check', () => {
   const root = makeRepo({
     'README.md': '# Repo\n',

@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - '**/*.md'
+      - '**/*.mdx'
       - 'verify-docs.config.json'
       - 'document-size-exceptions.json'
       - 'scripts/**'

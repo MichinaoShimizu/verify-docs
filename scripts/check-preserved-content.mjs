@@ -20,7 +20,7 @@ const KINDS = { codeBlock: 'コードブロック', codeSpan: 'コードスパ�
 const URL_PATTERN = /https?:\/\/[^\s<>()[\]"'`]+/g;
 
 const normalizeBlock = (text) => text.split(/\r?\n/).map((line) => line.trimEnd()).join('\n').trim();
-const isMarkdown = (path) => path.toLowerCase().endsWith('.md') && !/(^|\/)(node_modules|\.git|\.verify-docs)\//.test(path);
+const isMarkdown = (path) => /\.mdx?$/i.test(path) && !/(^|\/)(node_modules|\.git|\.verify-docs)\//.test(path);
 
 /** 文書から照合対象（コードブロック・コードスパン・URL）を出現行つきで取り出す。 */
 export function extractPreservedContent(source) {

@@ -36,7 +36,7 @@ for (const path of paths) {
     console.error(`リポジトリ外のパスは指定できません: ${path}`);
     process.exit(2);
   }
-  if (!absolute.toLowerCase().endsWith('.md')) {
+  if (!/\.mdx?$/i.test(absolute)) {
     console.error(`Markdownファイルを指定してください: ${path}`);
     process.exit(2);
   }

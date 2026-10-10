@@ -9,7 +9,7 @@
 
 そのため `excludePaths` に列挙したディレクトリ（既定は `node_modules/`・
 `.git/`・`vendor/`・`dist/`・`build/`）を除き、リポジトリ全体の `*.md` を
-検査対象とする（除外リスト方式）。`entryPoints`・`docsDir`・`skillsDir` は
+検査対象とする（除外リスト方式。対象の拡張子は `extensions` で変えられる）。`entryPoints`・`docsDir`・`skillsDir` は
 検査対象への出し入れではなく、「その文書に何を期待するか」（孤立チェック
 免除の起点か、`SKILL.md` の目次に載るべき補助文書か）を決めるためだけに
 使う。
