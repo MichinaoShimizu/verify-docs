@@ -10,9 +10,10 @@ import { resolve } from 'node:path';
 import { parseMarkdown } from './markdown-structure.mjs';
 
 const USAGE = [
-  'Usage: node scripts/check-preserved-content.mjs --base=<git-rev> [--root=<dir>] [--json] [<file.md>...]',
+  'Usage: node scripts/check-preserved-content.mjs --base=<git-rev> [--root=<dir>] [--per-file] [--json] [<file.md>...]',
   'List code blocks, code spans and URLs in the Markdown at <git-rev> that no longer appear in any Markdown in the working tree.',
   'Pass files to limit the check to those documents at <git-rev> (for example, the documents you edited).',
+  '--per-file compares each document that still exists with itself and also reports values whose count dropped in that document.',
   'Exits 1 when something is missing: restore it, or record why it was removed on purpose.',
 ].join('\n');
 
@@ -29,7 +30,9 @@ export function extractPreservedContent(source) {
   for (let event = walker.next(); event; event = walker.next()) {
     const { node, entering } = event;
     if (!entering) continue;
-    const line = node.sourcepos?.[0]?.[0] ?? node.parent?.sourcepos?.[0]?.[0] ?? 0;
+    let line = 0;
+    // インラインのノードは位置を持たないため、位置を持つ親（段落・見出し・表のセル）まで遡る。
+    for (let current = node; current && !line; current = current.parent) line = current.sourcepos?.[0]?.[0] ?? 0;
     if (node.type === 'code_block') {
       const value = normalizeBlock(node.literal ?? '');
       if (value) items.push({ kind: 'codeBlock', value, line });
@@ -45,8 +48,45 @@ export function extractPreservedContent(source) {
   return items;
 }
 
-/** 基準側の各項目が、作業後の文書群のどこかに残っているかを照合する。 */
-export function findMissingContent(before, after) {
+/** 同じ文書の中で、基準時より出現回数が減った項目を返す。文書間で内容を移さない簡潔化向け。 */
+function findDecreasedInSameFile(beforeSource, afterSource, path) {
+  const afterItems = extractPreservedContent(afterSource);
+  const afterBlocks = afterItems.filter(({ kind }) => kind === 'codeBlock').map(({ value }) => value);
+  const tally = new Map();
+  for (const { kind, value } of afterItems) {
+    const identity = JSON.stringify([kind, value]);
+    tally.set(identity, (tally.get(identity) ?? 0) + 1);
+  }
+  const decreased = [];
+  const seen = new Map();
+  for (const { kind, value, line } of extractPreservedContent(beforeSource)) {
+    const identity = JSON.stringify([kind, value]);
+    const occurrence = (seen.get(identity) ?? 0) + 1;
+    seen.set(identity, occurrence);
+    // コードブロックは、より大きなブロックへ統合された場合も残っているとみなす。
+    const available = kind === 'codeBlock'
+      ? afterBlocks.filter((block) => block.includes(value)).length
+      : tally.get(identity) ?? 0;
+    if (occurrence > available) decreased.push({ kind, path, line, value });
+  }
+  return decreased;
+}
+
+/**
+ * 基準側の各項目が、作業後の文書群のどこかに残っているかを照合する。
+ * perFile を指定すると、作業後にも同じパスで残る文書は、その文書の中で出現回数が減っていないかを照合する。
+ */
+export function findMissingContent(before, after, { perFile = false } = {}) {
+  if (perFile) {
+    const afterByPath = new Map(after.map(({ path, source }) => [path, source]));
+    const elsewhere = before.filter(({ path }) => !afterByPath.has(path));
+    const { counts, missing } = findMissingContent(elsewhere, after);
+    for (const { path, source } of before.filter(({ path }) => afterByPath.has(path))) {
+      for (const { kind } of extractPreservedContent(source)) counts[kind] += 1;
+      missing.push(...findDecreasedInSameFile(source, afterByPath.get(path), path));
+    }
+    return { counts, missing };
+  }
   const remaining = { codeBlock: [], codeSpan: new Set(), url: new Set() };
   for (const { source } of after) {
     for (const { kind, value } of extractPreservedContent(source)) {
@@ -81,7 +121,7 @@ if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pat
     console.log(USAGE);
     process.exit(0);
   }
-  const unknown = args.filter((arg) => arg.startsWith('-') && !/^--(base|root)=/.test(arg) && arg !== '--json');
+  const unknown = args.filter((arg) => arg.startsWith('-') && !/^--(base|root)=/.test(arg) && !['--json', '--per-file'].includes(arg));
   const base = args.find((arg) => arg.startsWith('--base='))?.slice('--base='.length);
   if (unknown.length || !base) {
     console.error(`${unknown.length ? `不明な引数: ${unknown.join(' ')}` : '--base=<git-rev> を指定してください'}\n${USAGE}`);
@@ -106,7 +146,7 @@ if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pat
     process.exit(2);
   }
 
-  const { counts, missing } = findMissingContent(before, after);
+  const { counts, missing } = findMissingContent(before, after, { perFile: args.includes('--per-file') });
   if (args.includes('--json')) {
     console.log(JSON.stringify({ kind: 'PreservedContentReport', base, documents: before.length, counts, missing }, null, 2));
   } else {
