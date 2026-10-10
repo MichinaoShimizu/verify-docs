@@ -469,6 +469,21 @@ test('explicit heading IDs ({#id} and {/* #id */}) are fragment targets', () => 
   rmSync(root, { recursive: true, force: true });
 });
 
+test('reports Markdown-like documents left out by extensions', () => {
+  const root = makeRepo({
+    'README.md': '# Repo\n',
+    'docs/a.mdx': '# A\n',
+    'docs/b.mdx': '# B\n',
+    'dist/c.mdx': '# C\n',
+  });
+  assert.deepEqual(run(root).summary.documents.unscanned, { '.mdx': 2 });
+  const output = execFileSync('node', [SCRIPT, `--root=${root}`], { encoding: 'utf8' });
+  assert.match(output, /\.mdx の文書 2 件は検査対象外（検査するには verify-docs\.config\.json の extensions に "\.mdx" を加える）/);
+  writeFileSync(join(root, 'verify-docs.config.json'), JSON.stringify({ extensions: ['.md', '.mdx'] }));
+  assert.equal(run(root).summary.documents.unscanned, undefined);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('extensions adds MDX documents to every check', () => {
   const files = {
     'README.md': '# Repo\n\n[guide](docs/guide.mdx)\n',

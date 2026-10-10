@@ -319,6 +319,10 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
       entry.includes('/') ? relFile === entry : relFile.split(/[\\/]/).at(-1) === entry)
     || anyDepthFiles.some((pattern) => `/${posix(relFile)}`.endsWith(pattern));
 
+  // `extensions` に含めていない Markdown 系の文書は、検査されないまま見落とされやすいので数えて知らせる。
+  const MARKDOWN_LIKE = ['.md', '.mdx', '.markdown'];
+  const unscanned = {};
+
   function walk(dir, hits = []) {
     if (!existsSync(dir)) return hits;
     for (const name of readdirSync(dir)) {
@@ -332,6 +336,9 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
         walk(full, hits);
       } else if (config.extensions.some((extension) => name.endsWith(extension)) && !isExcludedFile(rel)) {
         hits.push(rel);
+      } else if (!isExcludedFile(rel)) {
+        const extension = MARKDOWN_LIKE.find((candidate) => name.endsWith(candidate));
+        if (extension) unscanned[extension] = (unscanned[extension] ?? 0) + 1;
       }
     }
     return hits;
@@ -911,6 +918,7 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
       bytes: documentMetrics.reduce((sum, document) => sum + document.bytes, 0),
       headings: documentMetrics.reduce((sum, document) => sum + document.headings, 0),
       paragraphs: documentMetrics.reduce((sum, document) => sum + document.paragraphs, 0),
+      ...(Object.keys(unscanned).length ? { unscanned } : {}),
     },
     sizeExceptions: {
       count: sizeExceptions.size,
@@ -968,6 +976,9 @@ export function printVerificationReport(verificationReport, { json = false } = {
       `文書 ${summary.documents.count} 件（見出し ${summary.documents.headings} 件・` +
       `段落 ${summary.documents.paragraphs} 件・${summary.documents.bytes} バイト、文書サイズ例外 ${summary.sizeExceptions.count} 件）を検査`,
     );
+    for (const [extension, count] of Object.entries(summary.documents.unscanned ?? {})) {
+      console.log(`${extension} の文書 ${count} 件は検査対象外（検査するには verify-docs.config.json の extensions に "${extension}" を加える）`);
+    }
     if (summary.largestSections.length > 0) {
       console.log('\n大きい節（末端節・上位5件）:');
       for (const section of summary.largestSections) {
