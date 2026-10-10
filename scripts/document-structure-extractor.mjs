@@ -7,12 +7,20 @@ import { extractProseBlocks } from './markdown-structure.mjs';
 const args = process.argv.slice(2);
 const rootOption = args.find((arg) => arg.startsWith('--root='));
 const ROOT = resolve(process.cwd(), rootOption?.slice('--root='.length) ?? '.');
+const formatOption = args.find((arg) => arg.startsWith('--format='));
+const format = formatOption?.slice('--format='.length) ?? 'json';
 const paths = args.filter((arg) => !arg.startsWith('--'));
 
 if (args.includes('--help') || args.includes('-h')) {
-  console.log('Usage: node scripts/document-structure-extractor.mjs [--root=<dir>] <file.md>...');
+  console.log('Usage: node scripts/document-structure-extractor.mjs [--root=<dir>] [--format=json|tsv] <file.md>...');
   console.log('Extract CommonMark headings and prose paragraphs as JSON with source lines and byte counts.');
+  console.log('--format=tsv prints one block per line (path, line, bytes, heading path, text) for reviewing many documents.');
   process.exit(0);
+}
+
+if (!['json', 'tsv'].includes(format)) {
+  console.error(`--format は json または tsv にしてください: ${format}`);
+  process.exit(2);
 }
 
 if (paths.length === 0) {
@@ -45,4 +53,21 @@ for (const path of paths) {
   });
 }
 
-console.log(JSON.stringify(documents, null, 2));
+if (format === 'tsv') {
+  // 多数の文書を棚卸しするときの一覧。1ブロック1行で、本文中のタブと改行は空白にする。
+  const cell = (value) => String(value).replace(/[\t\r\n]+/g, ' ');
+  console.log(['path', 'line', 'bytes', 'headingPath', 'text'].join('\t'));
+  for (const document of documents) {
+    for (const block of document.blocks) {
+      console.log([
+        document.path,
+        block.sourcepos.start.line,
+        block.bytes,
+        block.headingPath.join(' > '),
+        block.text,
+      ].map(cell).join('\t'));
+    }
+  }
+} else {
+  console.log(JSON.stringify(documents, null, 2));
+}
