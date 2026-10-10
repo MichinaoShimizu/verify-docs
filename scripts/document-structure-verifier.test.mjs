@@ -257,6 +257,22 @@ test('node_modules and .git in excludePaths are excluded at any depth, other ent
   rmSync(root, { recursive: true, force: true });
 });
 
+test('excludePaths entries without a trailing slash also exclude files', () => {
+  const shared = 'This paragraph is intentionally long enough to trigger duplicate detection logic here.';
+  const root = makeRepo({
+    'README.md': '# Repo\n',
+    'packages/a/CHANGELOG.md': `# A\n\n${shared}\n`,
+    'packages/b/CHANGELOG.md': `# B\n\n${shared}\n`,
+    'docs/old.md': '# Old\n[missing](missing.md)\n',
+    'packages/a/docs/old.md': '# Kept\n[missing](missing.md)\n',
+    'dist/out.md': '# Out\n[missing](missing.md)\n',
+    'verify-docs.config.json': JSON.stringify({ excludePaths: ['CHANGELOG.md', 'docs/old.md', 'dist'] }),
+  });
+  const scanned = [...new Set(run(root).violations.map((f) => f.from))].sort();
+  assert.deepEqual(scanned, ['packages/a/docs/old.md']);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('uses legacy .claude/skills when .agents/skills is absent', () => {
   const root = makeRepo({
     'README.md': '# Repo\n',

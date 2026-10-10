@@ -39,6 +39,7 @@ node scripts/document-structure-verifier.mjs --init-size-exceptions
 | よく出る違反 | 典型的な原因 | 対処 |
 | --- | --- | --- |
 | 重複が大量に出る | 版ごとの文書の複製（`website/versioned_docs/` など） | 複製側のディレクトリを `excludePaths` に加える |
+| 重複が大量に出る | パッケージごとの `CHANGELOG.md` に同じ変更が並ぶ | `CHANGELOG.md` を `excludePaths` に加える |
 | リンク切れ・孤立が大量に出る | テスト用の文書（`__fixtures__/` など）や生成物 | そのディレクトリを `excludePaths` に加える |
 | リンク切れが大量に出る | 静的サイト生成向けの拡張子なしリンク（`./guide`）やサイトルート基準のリンク（`/guide/`） | 検査はリポジトリ内でたどれるパスだけを正とする。`guide.md` のような実在するパスへ書き換える |
 | 孤立が大量に出る | サイドバー設定など、Markdown 以外からだけ到達する文書 | 入口文書か索引文書からリンクする |
