@@ -277,7 +277,11 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
    * 文書の置き場所になり得ないため、`excludePaths` に含めればどの階層でも除外する。
    * モノレポの `packages/a/node_modules/` に入った依存パッケージの README まで
    * 走査しないためである。build・dist などは `scripts/build/` のような正規の文書の
-   * 置き場所と同名になり得るため、直下だけを除外する。 */
+   * 置き場所と同名になり得るため、直下だけを除外する。
+   * `/` で終わらない項目はファイルにも一致する。`CHANGELOG.md` のように `/` を含まない
+   * 名前はどの階層の同名ファイルにも、`site/old.md` のように含むものは直下からの位置に
+   * 一致する。パッケージごとの CHANGELOG.md 間の重複のように、ファイル単位でしか
+   * 外せない対象のためである。 */
 
   const ANYWHERE = new Set(['node_modules', '.git']);
   const anywhereNames = new Set(
@@ -286,6 +290,9 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
   const isExcluded = (relDir) =>
     config.excludePaths.some((prefix) => `${relDir}/`.startsWith(prefix))
     || relDir.split(/[\\/]/).some((segment) => anywhereNames.has(segment));
+  const fileEntries = config.excludePaths.filter((entry) => !entry.endsWith('/'));
+  const isExcludedFile = (relFile) => fileEntries.some((entry) =>
+    entry.includes('/') ? relFile === entry : relFile.split(/[\\/]/).at(-1) === entry);
 
   function walk(dir, hits = []) {
     if (!existsSync(dir)) return hits;
@@ -298,7 +305,7 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
       if (info.isDirectory()) {
         if (isExcluded(rel)) continue;
         walk(full, hits);
-      } else if (name.endsWith('.md')) {
+      } else if (name.endsWith('.md') && !isExcludedFile(rel)) {
         hits.push(rel);
       }
     }

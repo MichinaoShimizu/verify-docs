@@ -45,7 +45,7 @@
 | `skillsDir`           | スキル定義を配置するディレクトリ（`<skillsDir>/<name>/SKILL.md` を想定）。既定は `.agents/skills`。存在しなければ `.claude/skills`、`.kiro/skills` の順に自動検出する |
 | `pathRoots`           | 本文中のバッククォート表記をパスとして検査する接頭辞                 |
 | `agentConfigDirs`     | スキル以外のエージェント設定文書を孤立チェックから除外するディレクトリ |
-| `excludePaths`        | 検査対象から除外するディレクトリ（下記「検査対象の集め方」を参照）。既定に含まれる `.verify-docs/` は作業記録と保守報告の保管先（[作業記録と保守報告「作業記録」](work-records-and-report.md#作業記録)を参照） |
+| `excludePaths`        | 検査対象から除外するディレクトリまたはファイル（下記「検査対象の集め方」を参照）。既定に含まれる `.verify-docs/` は作業記録と保守報告の保管先（[作業記録と保守報告「作業記録」](work-records-and-report.md#作業記録)を参照） |
 | `maxDocBytes`         | 1文書あたりの上限（バイト数）。超過時は分割するか文書サイズ例外一覧に記載する    |
 | `minDuplicateChars`   | AST抽出した段落本文の最小文字数。値が小さいほど誤検知が増加する |
 | `checkDuplicates`     | 完全一致の重複検査の有効・無効。既定は有効                           |
