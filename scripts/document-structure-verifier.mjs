@@ -406,13 +406,14 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
 
   /* ---------- 見出しから断片を作る（GitHub と同じ規則） ---------- */
 
+  // github-slugger と同じく、文字・結合記号・数字・連結句読点・ハイフン・空白以外を消し、
+  // 空白を1文字ずつハイフンにする。前後の切り詰めや連続空白の圧縮はしない
+  // （`A & B` は `a--b`、`🚀 Title` は `-title` になる）。
   const slug = (heading) =>
     heading
-      .trim()
       .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s_-]/gu, '')
-      .trim()
-      .replace(/\s+/g, '-');
+      .replace(/[^\p{L}\p{M}\p{N}\p{Pc}\- ]/gu, '')
+      .replace(/ /g, '-');
 
   /** コードブロックの中は本文ではないので、見出しもリンクも拾わない。重複検査にも使う。 */
   function stripFences(text) {

@@ -192,6 +192,29 @@ test('HTML anchors do not shift GitHub duplicate-heading suffixes', () => {
   rmSync(root, { recursive: true, force: true });
 });
 
+test('builds fragment IDs exactly like GitHub (github-slugger)', () => {
+  const root = makeRepo({
+    'README.md': [
+      '# Repo',
+      '',
+      '## Linting & Formatting',
+      '',
+      '## 🚀 Emoji 見出し',
+      '',
+      '## I ♥ unicode.',
+      '',
+      '## snake_case and हिन्दी',
+      '',
+      '[a](#linting--formatting) [b](#-emoji-見出し) [c](#i--unicode) [d](#snake_case-and-हिन्दी)',
+      '[old-a](#linting-formatting) [old-b](#emoji-見出し)',
+      '',
+    ].join('\n'),
+  });
+  const fragments = run(root).violations.filter((f) => f.kind === 'fragment').map((f) => decodeURIComponent(f.target));
+  assert.deepEqual(fragments, ['#linting-formatting', '#emoji-見出し']);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('recognizes GitHub-style fragment IDs for duplicate headings', () => {
   const root = makeRepo({
     'README.md': '# Repo\n\n[second duplicate](docs/guide.md#section-2)\n',
