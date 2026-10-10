@@ -64,7 +64,7 @@ jobs:
           {
             echo '## Remote install smoke test'
             echo
-            echo "- :white_check_mark: `$SMOKE_REPOSITORY@$SMOKE_REF` の raw install.sh を取得"
+            echo "- :white_check_mark: \`$SMOKE_REPOSITORY@$SMOKE_REF\` の raw install.sh を取得"
             echo '- :white_check_mark: 同じrefのアーカイブから導入'
             echo '- :white_check_mark: 配布用 references/ を生成し、docs/ 全体を導入先へコピーしない'
           } >> "$GITHUB_STEP_SUMMARY"
