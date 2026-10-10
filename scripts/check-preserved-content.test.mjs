@@ -25,6 +25,23 @@ test('reports code blocks, code spans and URLs that disappeared from every docum
   ]);
 });
 
+test('per-file mode reports values whose count dropped in a document that still exists', () => {
+  const before = [
+    { path: 'docs/a.md', source: '# A\n\nUse `--cache` here and `--cache` there.\n' },
+    { path: 'docs/b.md', source: '# B\n\nAlso `--cache`.\n' },
+    { path: 'docs/old.md', source: '# Old\n\nRun `npm test`.\n' },
+  ];
+  const after = [
+    { path: 'docs/a.md', source: '# A\n\nUse `--cache` here.\n' },
+    { path: 'docs/b.md', source: '# B\n\nAlso `--cache`.\n' },
+    { path: 'docs/new.md', source: '# New\n\nRun `npm test`.\n' },
+  ];
+  assert.deepEqual(findMissingContent(before, after).missing, []);
+  const { counts, missing } = findMissingContent(before, after, { perFile: true });
+  assert.deepEqual(counts, { codeBlock: 0, codeSpan: 4, url: 0 });
+  assert.deepEqual(missing.map(({ path, value }) => [path, value]), [['docs/a.md', '--cache']]);
+});
+
 test('compares the working tree with a git revision and exits 1 when content is missing', () => {
   const root = mkdtempSync(join(tmpdir(), 'preserved-content-'));
   try {
