@@ -325,6 +325,19 @@ test('skill references reachable through other references of the same skill are 
   rmSync(root, { recursive: true, force: true });
 });
 
+test('orphanExemptPaths exempts only the orphan check', () => {
+  const root = makeRepo({
+    'README.md': '# Repo\n',
+    'website/docs/intro.md': '# Intro\n\n[missing](missing.md)\n',
+    'website/docs/guide/setup.md': '# Setup\n',
+    'website/blog/post.md': '# Post\n',
+    'verify-docs.config.json': JSON.stringify({ orphanExemptPaths: ['website/docs/'] }),
+  });
+  const found = run(root).violations.map((f) => `${f.kind}:${f.from}`).sort();
+  assert.deepEqual(found, ['link:website/docs/intro.md', 'orphan:website/blog/post.md']);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('agent configuration docs are exempt from orphan checks', () => {
   const root = makeRepo({
     'README.md': '# Repo\n',

@@ -61,6 +61,7 @@
  *       "pathRoots": ["src/", "docs/", "scripts/", ".agents/", ".claude/", ".kiro/", ".github/"],
  *       "agentConfigDirs": [".agents", ".claude", ".kiro"],
  *       "excludePaths": ["node_modules/", ".git/", "vendor/", "dist/", "build/", ".verify-docs/"],
+ *       "orphanExemptPaths": [],
  *       "maxDocBytes": 7000,
  *       "minDuplicateChars": 60,
  *       "checkDuplicates": true,
@@ -111,6 +112,7 @@ export const DEFAULTS = {
   pathRoots: ['src/', 'docs/', 'scripts/', '.agents/', '.claude/', '.kiro/', '.github/'],
   agentConfigDirs: ['.agents', '.claude', '.kiro'],
   excludePaths: ['node_modules/', '.git/', 'vendor/', 'dist/', 'build/', '.verify-docs/'],
+  orphanExemptPaths: [],
   maxDocBytes: 7000,
   minDuplicateChars: 60,
   checkDuplicates: true,
@@ -135,6 +137,7 @@ const CONFIG_TYPES = {
   pathRoots: 'string[]',
   agentConfigDirs: 'string[]',
   excludePaths: 'string[]',
+  orphanExemptPaths: 'string[]',
   maxDocBytes: 'positive integer',
   minDuplicateChars: 'positive integer',
   checkDuplicates: 'boolean',
@@ -179,7 +182,7 @@ function validateConfig(config) {
       if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || item.trim() === '')) {
         throw new Error(`${key} は空でない文字列の配列にしてください`);
       }
-      if (['entryPoints', 'pathRoots', 'agentConfigDirs', 'excludePaths'].includes(key)) {
+      if (['entryPoints', 'pathRoots', 'agentConfigDirs', 'excludePaths', 'orphanExemptPaths'].includes(key)) {
         value.forEach((item, index) => validateRelativePath(item, `${key}[${index}]`));
       }
     } else if (type === 'positive integer') {
@@ -586,8 +589,14 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
     reachableFromSkill.set(doc, reached);
   }
 
+  // サイドバー設定など、Markdown 以外からだけ到達する文書群は orphanExemptPaths で
+  // 孤立チェックだけを免除する。リンク切れ・サイズ・重複の検査は続ける。
+  const isOrphanExempt = (doc) =>
+    config.orphanExemptPaths.some((dir) => doc.startsWith(`${dir.replace(/\/+$/, '')}/`));
+
   for (const doc of documents) {
     if (config.entryPoints.includes(doc)) continue;
+    if (isOrphanExempt(doc)) continue;
 
     const skill = skillDoc(doc);
     if (skill) {
