@@ -5,3 +5,18 @@
 同じ作業単位では、実行履歴と開始時点のサイズを引き継ぐ。PR 作成後のレビュー対応、同じ目的に対する追加の是正、同じ変更系列の再検査は、同じ作業単位として扱う。
 
 前の作業単位を含む PR が merge 済みである場合、または目的・対象範囲を変えて新しい PR の作業を始める場合は、新しい作業単位とする。新しい作業単位の一時記録を統合するときは、既存の `maintenance-report.md` を新しい作業単位の記録で置き換える。前の記録は merge 済みのコミットと PR に残るため、`maintenance-report.md` へ再掲しない。
+
+## 作業単位の基準
+
+開始前から違反が残っている文書群では、作業単位の開始時に一度だけ検査結果を保存する。
+続けて実行するスキルも同じファイルを `--baseline` に渡し、スキルごとに保存し直さない。
+
+```bash
+node scripts/document-structure-verifier.mjs --json > .verify-docs/dist/baseline.work.json
+node scripts/document-structure-verifier.mjs --baseline=.verify-docs/dist/baseline.work.json
+```
+
+`node scripts/check-preserved-content.mjs --base=<開始コミット>` の開始コミットも、作業単位の
+開始時点のコミットとする。先に実行したスキルが一時記録へ理由を書いた項目は、後のスキルで
+同じ理由を書き直さない。保守報告には基準にあった違反の件数を記録し、基準ファイルのパスは
+記録しない。基準ファイルは一時記録と同じく、作業単位の完了後に削除する。

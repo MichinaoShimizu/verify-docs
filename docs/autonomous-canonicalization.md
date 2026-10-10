@@ -54,7 +54,7 @@
 対象外の文書を変更しない。これらを守ったまま統合できない情報は残し、未完了にはせず理由を
 記録する。
 
-統合・削除の後、`node scripts/check-preserved-content.mjs --base=<開始コミット>` を実行し、
+統合・削除の後、`node scripts/check-preserved-content.mjs --base=<開始コミット>`（[作業単位の基準](work-record-lifecycle.md#作業単位の基準)）を実行し、
 正本へ移したつもりで失われたコードブロック・コードスパン・URL がないかを確かめる。列挙された
 項目は正本へ戻すか、残さない理由を一時作業記録に書く。
 

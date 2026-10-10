@@ -72,8 +72,9 @@ fi
 test "$(grep -Fxc '<!-- verify-docs:required-skill:start -->' "$install_target/AGENTS.md")" = "1"
 test "$(grep -Fxc '<!-- verify-docs:required-skill:end -->' "$install_target/AGENTS.md")" = "1"
 grep -Fqx '@AGENTS.md' "$install_target/CLAUDE.md"
-test "$(grep -Fxc '.verify-docs/dist/*.work.md' "$install_target/.gitignore")" = "1"
+test "$(grep -Fxc '.verify-docs/dist/*.work.*' "$install_target/.gitignore")" = "1"
 git -C "$install_target" check-ignore -q --no-index -- .verify-docs/dist/verify-docs.work.md
+git -C "$install_target" check-ignore -q --no-index -- .verify-docs/dist/baseline.work.json
 if git -C "$install_target" check-ignore -q --no-index -- .verify-docs/dist/maintenance-report.md; then
   echo "installer must keep maintenance-report.md tracked" >&2
   exit 1
@@ -143,10 +144,17 @@ test -f "$conflicting_skill_target/.kiro/skills/verify-docs/SKILL.md"
 
 printf '.verify-docs/\n' > "$ignore_target/.gitignore"
 (cd "$ignore_target" && bash "$dir/install.sh" --source "$dir")
-if grep -Fxq '.verify-docs/dist/*.work.md' "$ignore_target/.gitignore"; then
+if grep -Fxq '.verify-docs/dist/*.work.*' "$ignore_target/.gitignore"; then
   echo "installer must not duplicate a broader ignore rule" >&2
   exit 1
 fi
+
+legacy_ignore_target="$(mktemp -d)"
+git -C "$legacy_ignore_target" init -q
+printf '.verify-docs/dist/*.work.md\n' > "$legacy_ignore_target/.gitignore"
+(cd "$legacy_ignore_target" && bash "$dir/install.sh" --source "$dir" >/dev/null)
+git -C "$legacy_ignore_target" check-ignore -q --no-index -- .verify-docs/dist/baseline.work.json
+rm -rf "$legacy_ignore_target"
 
 printf 'conflict\n' > "$install_target/scripts/document-structure-verifier.mjs"
 if (cd "$install_target" && bash "$dir/install.sh" --source "$dir" >/dev/null 2>&1); then

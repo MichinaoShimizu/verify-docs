@@ -111,7 +111,7 @@ bundled_skills=(
   tighten-docs
 )
 
-work_record_ignore='.verify-docs/dist/*.work.md'
+work_record_ignore='.verify-docs/dist/*.work.*'
 
 item_source_root() {
   if [[ "$1" == .agents/skills/* ]]; then
@@ -128,7 +128,7 @@ has_work_record_ignore() {
   [[ -f "$gitignore" ]] || return 1
   while IFS= read -r entry || [[ -n "$entry" ]]; do
     case "$entry" in
-      "$work_record_ignore"|"/$work_record_ignore"|'.verify-docs/'|'/.verify-docs/'|'.verify-docs/**'|'/.verify-docs/**'|'.verify-docs/dist/'|'/.verify-docs/dist/'|'.verify-docs/dist/*'|'/.verify-docs/dist/*'|'.verify-docs/dist/**'|'/.verify-docs/dist/**'|'*.work.md'|'**/*.work.md')
+      "$work_record_ignore"|"/$work_record_ignore"|'.verify-docs/'|'/.verify-docs/'|'.verify-docs/**'|'/.verify-docs/**'|'.verify-docs/dist/'|'/.verify-docs/dist/'|'.verify-docs/dist/*'|'/.verify-docs/dist/*'|'.verify-docs/dist/**'|'/.verify-docs/dist/**'|'*.work.*'|'**/*.work.*')
         return 0
         ;;
     esac
