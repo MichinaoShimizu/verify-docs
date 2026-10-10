@@ -29,6 +29,7 @@
     ".verify-docs/"
   ],
   "orphanExemptPaths": [],
+  "extensions": [".md"],
   "maxDocBytes": 7000,
   "minDuplicateChars": 60,
   "checkDuplicates": true,

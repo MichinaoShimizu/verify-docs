@@ -29,6 +29,7 @@
   "agentConfigDirs": [".agents", ".claude", ".kiro"],
   "excludePaths": ["node_modules/", ".git/", "vendor/", "dist/", "build/", ".verify-docs/"],
   "orphanExemptPaths": [],
+  "extensions": [".md"],
   "maxDocBytes": 7000,
   "minDuplicateChars": 60,
   "checkDuplicates": true,
@@ -48,6 +49,7 @@
 | `agentConfigDirs`     | スキル以外のエージェント設定文書を孤立チェックから除外するディレクトリ |
 | `excludePaths`        | 検査対象から除外するディレクトリまたはファイル（下記「検査対象の集め方」を参照）。既定に含まれる `.verify-docs/` は作業記録と保守報告の保管先（[作業記録と保守報告「作業記録」](work-records-and-report.md#作業記録)を参照） |
 | `orphanExemptPaths`   | 孤立チェックだけを免除するディレクトリ（リポジトリ直下からの位置）。サイドバー設定など Markdown 以外からだけ到達する文書群に使う。既定は空 |
+| `extensions` | 検査する文書の拡張子。既定は `[".md"]`。MDX の文書群では `[".md", ".mdx"]` にする |
 | `maxDocBytes`         | 1文書あたりの上限（バイト数）。超過時は分割するか文書サイズ例外一覧に記載する    |
 | `minDuplicateChars`   | AST抽出した段落本文の最小文字数。値が小さいほど誤検知が増加する |
 | `checkDuplicates`     | 完全一致の重複検査の有効・無効。既定は有効                           |

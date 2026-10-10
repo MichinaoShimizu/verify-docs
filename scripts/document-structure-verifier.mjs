@@ -62,6 +62,7 @@
  *       "agentConfigDirs": [".agents", ".claude", ".kiro"],
  *       "excludePaths": ["node_modules/", ".git/", "vendor/", "dist/", "build/", ".verify-docs/"],
  *       "orphanExemptPaths": [],
+ *       "extensions": [".md"],
  *       "maxDocBytes": 7000,
  *       "minDuplicateChars": 60,
  *       "checkDuplicates": true,
@@ -115,6 +116,7 @@ export const DEFAULTS = {
   agentConfigDirs: ['.agents', '.claude', '.kiro'],
   excludePaths: ['node_modules/', '.git/', 'vendor/', 'dist/', 'build/', '.verify-docs/'],
   orphanExemptPaths: [],
+  extensions: ['.md'],
   maxDocBytes: 7000,
   minDuplicateChars: 60,
   checkDuplicates: true,
@@ -140,6 +142,7 @@ const CONFIG_TYPES = {
   agentConfigDirs: 'string[]',
   excludePaths: 'string[]',
   orphanExemptPaths: 'string[]',
+  extensions: 'extensions',
   maxDocBytes: 'positive integer',
   minDuplicateChars: 'positive integer',
   checkDuplicates: 'boolean',
@@ -179,6 +182,10 @@ function validateConfig(config) {
       }
       if (!['safe', 'auto'].includes(value.mode)) {
         throw new Error(`${key}.mode は safe または auto にしてください`);
+      }
+    } else if (type === 'extensions') {
+      if (!Array.isArray(value) || value.length === 0 || value.some((item) => typeof item !== 'string' || !/^\.[A-Za-z0-9]+$/.test(item))) {
+        throw new Error(`${key} は ".md" のような拡張子の、空でない配列にしてください`);
       }
     } else if (type === 'string[]') {
       if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || item.trim() === '')) {
@@ -323,7 +330,7 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
       if (info.isDirectory()) {
         if (isExcluded(rel)) continue;
         walk(full, hits);
-      } else if (name.endsWith('.md') && !isExcludedFile(rel)) {
+      } else if (config.extensions.some((extension) => name.endsWith(extension)) && !isExcludedFile(rel)) {
         hits.push(rel);
       }
     }
@@ -411,6 +418,8 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
   // github-slugger と同じく、文字・結合記号・数字・連結句読点・ハイフン・空白以外を消し、
   // 空白を1文字ずつハイフンにする。前後の切り詰めや連続空白の圧縮はしない
   // （`A & B` は `a--b`、`🚀 Title` は `-title` になる）。
+  // Docusaurus などの明示的な見出し ID（`## 見出し {#id}`・`## 見出し {/* #id */}`）。
+  const EXPLICIT_HEADING_ID = /\s*\{(?:#([^\s}]+)|\/\*\s*#(\S+?)\s*\*\/)\}\s*$/;
   const slug = (heading) =>
     heading
       .toLowerCase()
@@ -447,7 +456,7 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
     const body = stripFences(source);
     bodies.set(doc, body);
     const ids = new Set();
-    // `<a name="step1"></a>` のような HTML の id・name 属性も断片の飛び先になる。
+    // `<a name="step1"></a>` のような HTML の id・name 属性と、明示的な見出し ID も断片の飛び先になる。
     // 見出しの重複番号（-1, -2）は見出しだけで数えるため、別に集めて最後に合わせる。
     const htmlIds = new Set();
     const walker = tree.walker();
@@ -461,7 +470,10 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
         continue;
       }
       if (event.node.type !== 'heading') continue;
-      const base = slug(markdownText(event.node));
+      const text = markdownText(event.node);
+      const explicit = text.match(EXPLICIT_HEADING_ID);
+      if (explicit) htmlIds.add(explicit[1] ?? explicit[2]);
+      const base = slug(explicit ? text.slice(0, explicit.index) : text);
       let id = base;
       let suffix = 1;
       while (ids.has(id)) id = `${base}-${suffix++}`;
@@ -470,6 +482,9 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
     for (const id of htmlIds) ids.add(id);
     fragments.set(doc, ids);
   }
+
+  // 見出しの slug は小文字だが、HTML の id と明示的な見出し ID は大文字を含みうる。
+  const hasFragment = (doc, fragment) => fragments.get(doc).has(fragment) || fragments.get(doc).has(fragment.toLowerCase());
 
   function locationFor(doc, position) {
     if (!position) return undefined;
@@ -528,7 +543,7 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
       const fragment = rawFragment === undefined ? undefined : decodeLinkPart(rawFragment);
 
       if (path === '') {
-        if (fragment && !fragments.get(doc).has(fragment.toLowerCase())) {
+        if (fragment && !hasFragment(doc, fragment)) {
           fail('fragment', doc, target, `この文書に見出し「${fragment}」がない`, {
             location: locationFor(doc, nodePosition(node)),
           });
@@ -548,7 +563,7 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
       if (!fragment) continue;
       const targetDoc = relative(repoRoot, full);
       if (!fragments.has(targetDoc)) continue;
-      if (!fragments.get(targetDoc).has(fragment.toLowerCase())) {
+      if (!hasFragment(targetDoc, fragment)) {
         fail('fragment', doc, target, `${targetDoc} に見出し「${fragment}」がない`, {
           location: locationFor(doc, nodePosition(node)),
         });
