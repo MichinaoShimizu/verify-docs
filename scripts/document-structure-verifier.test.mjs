@@ -273,6 +273,23 @@ test('excludePaths entries without a trailing slash also exclude files', () => {
   rmSync(root, { recursive: true, force: true });
 });
 
+test('excludePaths entries starting with **/ match at any depth', () => {
+  const broken = '# Broken\n[missing](missing.md)\n';
+  const root = makeRepo({
+    'README.md': '# Repo\n',
+    'packages/a/src/__tests__/__fixtures__/base.md': broken,
+    '__fixtures__/top.md': broken,
+    'tests/format/js/README.md': broken,
+    'other/tests/format/x.md': broken,
+    'tests/formatter/keep.md': broken,
+    'packages/b/NOTES.md': broken,
+    'verify-docs.config.json': JSON.stringify({ excludePaths: ['**/__fixtures__/', '**/tests/format/', '**/b/NOTES.md'] }),
+  });
+  const scanned = [...new Set(run(root).violations.map((f) => f.from))].sort();
+  assert.deepEqual(scanned, ['tests/formatter/keep.md']);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('uses legacy .claude/skills when .agents/skills is absent', () => {
   const root = makeRepo({
     'README.md': '# Repo\n',

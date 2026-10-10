@@ -19,7 +19,8 @@
 `packages/<name>/node_modules/` も含む）。`build/` などは同名の正規の文書置き場が
 あり得るため、直下だけを除外する。`/` で終わらない項目はファイルにも一致し、
 `CHANGELOG.md` のように `/` を含まない名前はどの階層の同名ファイルにも、
-`site/old.md` のように含むものは直下からの位置に一致する。
+`site/old.md` のように含むものは直下からの位置に一致する。`**/` で始まる項目
+（`**/__fixtures__/`）は、続くパスにどの階層でも一致する。
 
 モノレポで各パッケージを個別に `--root=packages/<name>`（詳細は
 `scripts/document-structure-verifier.mjs` の `--root` オプションを

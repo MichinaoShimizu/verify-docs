@@ -284,18 +284,31 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
    * `/` で終わらない項目はファイルにも一致する。`CHANGELOG.md` のように `/` を含まない
    * 名前はどの階層の同名ファイルにも、`site/old.md` のように含むものは直下からの位置に
    * 一致する。パッケージごとの CHANGELOG.md 間の重複のように、ファイル単位でしか
-   * 外せない対象のためである。 */
+   * 外せない対象のためである。
+   * 先頭が「**」と「/」の項目（ANY_DEPTH）は、続くパスにどの階層でも一致する。
+   * パッケージ内の深い位置にあるテスト用の文書を、既存項目の意味を変えずに外すためである。 */
 
   const ANYWHERE = new Set(['node_modules', '.git']);
   const anywhereNames = new Set(
     config.excludePaths.map((entry) => entry.replace(/\/+$/, '')).filter((name) => ANYWHERE.has(name)),
   );
+  const ANY_DEPTH = '**/';
+  const anyDepthDirs = config.excludePaths
+    .filter((entry) => entry.startsWith(ANY_DEPTH) && entry.endsWith('/'))
+    .map((entry) => `/${entry.slice(ANY_DEPTH.length)}`);
+  const anyDepthFiles = config.excludePaths
+    .filter((entry) => entry.startsWith(ANY_DEPTH) && !entry.endsWith('/'))
+    .map((entry) => `/${entry.slice(ANY_DEPTH.length)}`);
+  const posix = (path) => path.split(/[\\/]/).join('/');
   const isExcluded = (relDir) =>
     config.excludePaths.some((prefix) => `${relDir}/`.startsWith(prefix))
-    || relDir.split(/[\\/]/).some((segment) => anywhereNames.has(segment));
-  const fileEntries = config.excludePaths.filter((entry) => !entry.endsWith('/'));
-  const isExcludedFile = (relFile) => fileEntries.some((entry) =>
-    entry.includes('/') ? relFile === entry : relFile.split(/[\\/]/).at(-1) === entry);
+    || relDir.split(/[\\/]/).some((segment) => anywhereNames.has(segment))
+    || anyDepthDirs.some((pattern) => `/${posix(relDir)}/`.includes(pattern));
+  const fileEntries = config.excludePaths.filter((entry) => !entry.endsWith('/') && !entry.startsWith(ANY_DEPTH));
+  const isExcludedFile = (relFile) =>
+    fileEntries.some((entry) =>
+      entry.includes('/') ? relFile === entry : relFile.split(/[\\/]/).at(-1) === entry)
+    || anyDepthFiles.some((pattern) => `/${posix(relFile)}`.endsWith(pattern));
 
   function walk(dir, hits = []) {
     if (!existsSync(dir)) return hits;
