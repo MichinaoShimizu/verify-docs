@@ -382,7 +382,26 @@ test('--baseline reports an over-size document again when it grows', () => {
   writeFileSync(join(root, 'docs/big.md'), `${big}more\n`);
   const grown = verifyDocumentStructure(root, { baselinePath });
   assert.deepEqual(grown.violations.map(({ kind, bytes, baselineBytes }) => [kind, bytes, baselineBytes]), [['size', 213, 208]]);
-  assert.match(grown.violations[0].message, /5 バイト増えた/);
+  assert.match(grown.violations[0].reason, /5 バイト増えた/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+test('--baseline matches duplicates by paragraph and treats partial resolution as existing', () => {
+  const p1 = 'この段落は三つの文書に同じ文面で置かれており、重複として検出される長さを十分に持つように、さらに説明の文を一つ付け足してある。';
+  const p2 = 'こちらは後から複製される別の段落であり、同じ文書の組でも新しい重複として報告されるべき内容であり、こちらも長さの条件を満たすよう文を足してある。';
+  const root = makeRepo({
+    'README.md': '# Repo\n\n[a](docs/a.md) [b](docs/b.md) [c](docs/c.md)\n',
+    'docs/a.md': `# A\n\n${p1}\n\n${p2}\n`,
+    'docs/b.md': `# B\n\n${p1}\n`,
+    'docs/c.md': `# C\n\n${p1}\n`,
+  });
+  const baselinePath = join(root, 'baseline.json');
+  writeFileSync(baselinePath, JSON.stringify(run(root)));
+  writeFileSync(join(root, 'docs/c.md'), '# C\n\n[A](a.md) を参照する。\n');
+  assert.deepEqual(verifyDocumentStructure(root, { baselinePath }).violations, []);
+  writeFileSync(join(root, 'docs/b.md'), `# B\n\n${p1}\n\n${p2}\n`);
+  const added = verifyDocumentStructure(root, { baselinePath });
+  assert.deepEqual(added.violations.map(({ kind, from, target, text }) => [kind, from, target, text]), [['duplicate', 'docs/a.md', 'docs/b.md', p2]]);
   rmSync(root, { recursive: true, force: true });
 });
 
