@@ -699,7 +699,13 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
     }
   }
 
-  /** 見出し・表・意図した重複（allow-duplicate）を除いた、比較対象の段落だけを集める。 */
+  /* MDX の import/export 行やテンプレート指令（`{% %}`・`{{ }}`）だけの段落は、
+   * 文書ごとに書く必要がある機械的な記述でポインタにできない。文章ではないので比較しない。 */
+  const NON_PROSE_LINE =
+    /^\s*(?:import\s.*\sfrom\s+(['"]).+\1;?|import\s+(['"]).+\2;?|export\s+(?:const|let|var|default|function|\{).*|\{%.*%\}|\{\{.*\}\})\s*$/;
+  const isNonProse = (source) => source.split(/\r?\n/).every((line) => line.trim() === '' || NON_PROSE_LINE.test(line));
+
+  /** 見出し・表・意図した重複（allow-duplicate）・非文章を除いた、比較対象の段落だけを集める。 */
   function collectParagraphs() {
     const hits = [];
     for (const doc of documents) {
@@ -712,6 +718,7 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
       });
       for (const block of blocks) {
         if (block.source.trimStart().startsWith('|')) continue;
+        if (isNonProse(block.source)) continue;
 
         let previousLine = block.sourcepos.start.line - 2;
         while (previousLine >= 0 && lines[previousLine].trim() === '') previousLine--;

@@ -280,6 +280,23 @@ test('node_modules and .git in excludePaths are excluded at any depth, other ent
   rmSync(root, { recursive: true, force: true });
 });
 
+test('duplicate check skips paragraphs made only of MDX import/export lines or template directives', () => {
+  const nonProse = [
+    'import Tabs from "@theme/Tabs";\nimport TabItem from "@theme/TabItem";',
+    "{%- from 'components/npm_tabs.macro.html' import npm_tabs with context %}",
+    "export const meta = { title: 'A long enough exported metadata object for testing' };",
+  ].join('\n\n');
+  const prose = 'import the package before you start, then follow the remaining setup steps carefully.';
+  const root = makeRepo({
+    'README.md': '# Repo\n\n[a](docs/a.md) [b](docs/b.md)\n',
+    'docs/a.md': `# A\n\n${nonProse}\n\n${prose}\n`,
+    'docs/b.md': `# B\n\n${nonProse}\n\n${prose}\n`,
+  });
+  const duplicates = run(root).violations.filter((f) => f.kind === 'duplicate');
+  assert.deepEqual(duplicates.map((f) => f.reason.includes('import the package')), [true]);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('excludePaths entries without a trailing slash also exclude files', () => {
   const shared = 'This paragraph is intentionally long enough to trigger duplicate detection logic here.';
   const root = makeRepo({
