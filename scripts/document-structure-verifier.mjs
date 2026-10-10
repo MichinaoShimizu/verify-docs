@@ -29,9 +29,11 @@
  *     docsDir にもスキルディレクトリにも属さない文書（エージェント定義など）は
  *     孤立チェックの対象外（サイズ超過・重複チェックは対象。詳細は下記
  *     「検査対象の集め方」参照）
- *   - スキルの補助文書（references/ など）が、自分の SKILL.md から参照されているか
+ *   - スキルの補助文書（references/ など）が、自分の SKILL.md から同じスキル内の文書を
+ *     たどって到達できるか
  *   - 各文書のバイト数が、決めた上限を超えていないか（文書サイズ例外一覧に書いた例外は除く）
- *   - 同じ段落（一定の長さ以上）が複数の文書にそのまま重複していないか
+ *   - 同じ段落（一定の長さ以上）が複数の文書にそのまま重複していないか（スキル単体配布の
+ *     ために各スキルの references/ へ置いた、内容が完全に同じ複製は1つとして数える）
  *   - （既定オフ）句読点・敬体/常体だけが違う、ほぼ同じ段落が複数の文書に
  *     ないか（`checkNearDuplicates`。誤検知が増えやすいのでオプトイン）
  *
@@ -538,6 +540,28 @@ const skillDoc = (doc) => {
   return [rest.slice(0, slash), rest.slice(slash + 1)];
 };
 
+/* SKILL.md → 補助文書 A → 補助文書 B のように段階的に開示する構成を許すため、
+ * 補助文書は自分の SKILL.md から同じスキル内の文書をたどって到達できればよい。 */
+const reachableFromSkill = new Map();
+for (const doc of documents) {
+  const skill = skillDoc(doc);
+  if (!skill || skill[1] !== 'SKILL.md') continue;
+  const reached = new Set([doc]);
+  const skillPrefix = `${config.skillsDir}/${skill[0]}/`;
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const candidate of documents) {
+      if (reached.has(candidate) || !candidate.startsWith(skillPrefix)) continue;
+      if ([...(referencedBy.get(candidate) ?? [])].some((from) => reached.has(from))) {
+        reached.add(candidate);
+        grew = true;
+      }
+    }
+  }
+  reachableFromSkill.set(doc, reached);
+}
+
 for (const doc of documents) {
   if (config.entryPoints.includes(doc)) continue;
 
@@ -546,8 +570,8 @@ for (const doc of documents) {
     const [name, rest] = skill;
     if (rest === 'SKILL.md') continue;
     const owner = `${config.skillsDir}/${name}/SKILL.md`;
-    if (referencedBy.get(doc)?.has(owner)) continue;
-    fail('orphan', doc, doc, `${owner} から参照されていない（SKILL.md の目次に載せる）`);
+    if (reachableFromSkill.get(owner)?.has(doc)) continue;
+    fail('orphan', doc, doc, `${owner} からたどれない（SKILL.md の目次か、そこから参照される補助文書に載せる）`);
     continue;
   }
 
@@ -611,10 +635,26 @@ for (const path of sizeExceptions.keys()) {
 
 const ALLOW_MARKER = '<!-- verify-docs:allow-duplicate -->';
 
+/* スキルは単体で配布できるよう、同じ補助文書を各スキルの references/ へ複製する。
+ * 内容が完全に同じ複製は最初の1つだけを比較対象にする。内容がずれた複製は
+ * 通常どおり重複として報告する。 */
+const referenceReplicas = new Set();
+{
+  const seen = new Set();
+  for (const doc of documents) {
+    const skill = skillDoc(doc);
+    if (!skill || !skill[1].startsWith('references/')) continue;
+    const identity = JSON.stringify([skill[1], sources.get(doc)]);
+    if (seen.has(identity)) referenceReplicas.add(doc);
+    else seen.add(identity);
+  }
+}
+
 /** 見出し・表・意図した重複（allow-duplicate）を除いた、比較対象の段落だけを集める。 */
 function collectParagraphs() {
   const hits = [];
   for (const doc of documents) {
+    if (referenceReplicas.has(doc)) continue;
     const source = sources.get(doc);
     const lines = source.split(/\r?\n/);
     const { blocks } = extractProseBlocks(source, {

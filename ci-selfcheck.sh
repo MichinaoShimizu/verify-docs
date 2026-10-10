@@ -86,7 +86,14 @@ test -f "$install_target/scripts/vendor/commonmark.cjs"
 test -f "$install_target/scripts/vendor/commonmark-LICENSE.txt"
 cmp -s "$distribution_dir/verify-docs.config.json" "$install_target/verify-docs.config.json"
 test ! -e "$install_target/evals"
-node "$install_target/scripts/document-structure-verifier.mjs" --root="$install_target/scripts"
+node "$install_target/scripts/document-structure-verifier.mjs" --root="$install_target"
+printf '%s\n' '# Broken' '' '[missing](missing.md)' > "$install_target/broken.md"
+if node "$install_target/scripts/document-structure-verifier.mjs" --root="$install_target" > "$distribution_root/broken.log" 2>&1; then
+  echo "installed verifier must reject a broken link in the install target" >&2
+  exit 1
+fi
+grep -Fq '[リンク切れ] broken.md → missing.md' "$distribution_root/broken.log"
+rm "$install_target/broken.md"
 node "$install_target/scripts/document-structure-extractor.mjs" \
   --root="$install_target" .agents/skills/verify-docs/SKILL.md >/dev/null
 printf '%s\n' '{"left":{"id":"entry","path":"README.md","role":"entry","facts":{"purpose":"Install."}},"right":{"id":"guide","path":"docs/install.md","role":"detail","facts":{"purpose":"Install.","command":"bash install.sh"}}}' > "$install_target/candidate-pair.json"
