@@ -24,6 +24,8 @@ node scripts/document-structure-verifier.mjs --changed-base=origin/main
 開始前から違反が残っている文書群で、作業が新たな違反を生んでいないかを確かめる。
 開始時の `--json` 出力を保存し、作業後に `--baseline` で渡すと、基準にある違反
 （種別・発生元・対象が同じもの）を除いた新たな違反だけを失敗として返す。
+サイズ超過は、基準時より大きくなった文書を新たな違反として返す（既に上限を超えていた文書へ
+内容を移しても通過しないようにするため）。
 
 ```bash
 node scripts/document-structure-verifier.mjs --json > /tmp/verify-docs-baseline.json
