@@ -45,6 +45,24 @@ node scripts/document-structure-extractor.mjs --root=. README.md docs/guide.md
 
 多数の文書を棚卸しするときは `--format=tsv` を付ける。1段落を1行（パス・開始行・バイト数・見出し階層・本文）で出力し、JSON より大幅に小さい（vite の 40KB の文書で JSON 158KB に対し TSV 38KB）。
 
+`--format=pairs` は、指定した文書間で文字の並びが似た段落の組を、類似度・包含率の高い順に
+1組1行（`similarity`・`containment`・`left`・`right`・`leftText`・`rightText`）で出力する。
+言い換えの比較候補を挙げるだけで、重複かどうかは判定しない。
+
+## 保護内容の照合
+
+自律圧縮・自律正本化の後に、基準コミットの文書にあったコードブロック・コードスパン・URL が
+作業後の文書に残っているかを照合する。消えた項目があれば終了コード 1 で列挙する。
+
+```bash
+node scripts/check-preserved-content.mjs --base=<開始コミット>
+node scripts/check-preserved-content.mjs --base=<開始コミット> --per-file docs/guide.md
+```
+
+既定では文書群のどこかに残っていれば残っているとみなす。`--per-file` は残っている文書ごとに
+自分自身と比べ、同じ文書内で出現回数が減った値も報告する。ファイルを指定すると照合をその文書に限り、
+`--json` で結果を JSON で返す。
+
 ## 既存のサイズ超過の例外記録
 
 既存文書に違反があるリポジトリでは、最初に次を実行する。

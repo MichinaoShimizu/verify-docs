@@ -63,3 +63,21 @@ test('compares the working tree with a git revision and exits 1 when content is 
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('also checks extensions added in verify-docs.config.json', () => {
+  const root = mkdtempSync(join(tmpdir(), 'preserved-content-'));
+  try {
+    const git = (...args) => execFileSync('git', ['-C', root, ...args], { stdio: 'pipe' });
+    git('init', '-q');
+    writeFileSync(join(root, 'verify-docs.config.json'), JSON.stringify({ extensions: ['.md', '.markdown'] }));
+    writeFileSync(join(root, 'guide.markdown'), '# Guide\n\nRun `npm run build`.\n');
+    git('add', '.');
+    git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-qm', 'init');
+    writeFileSync(join(root, 'guide.markdown'), '# Guide\n\nBuild it.\n');
+    const result = spawnSync('node', [SCRIPT, '--base=HEAD', `--root=${root}`], { encoding: 'utf8' });
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /\[コードスパン\] guide\.markdown:3 — npm run build/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

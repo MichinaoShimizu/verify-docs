@@ -142,3 +142,17 @@ test('CLI rejects missing files and non-Markdown paths', () => {
     }
   });
 });
+
+test('accepts extensions added in verify-docs.config.json', () => {
+  withTempRepo((root) => {
+    writeFileSync(join(root, 'guide.markdown'), '# Guide\n\n本文。\n');
+    const rejected = (() => {
+      try { execFileSync('node', [SCRIPT, `--root=${root}`, 'guide.markdown'], { stdio: 'pipe' }); return 0; }
+      catch (error) { return error.status; }
+    })();
+    assert.equal(rejected, 2);
+    writeFileSync(join(root, 'verify-docs.config.json'), JSON.stringify({ extensions: ['.md', '.markdown'] }));
+    const [document] = JSON.parse(execFileSync('node', [SCRIPT, `--root=${root}`, 'guide.markdown'], { encoding: 'utf8' }));
+    assert.equal(document.path, 'guide.markdown');
+  });
+});

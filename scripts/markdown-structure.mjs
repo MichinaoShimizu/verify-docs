@@ -1,4 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
 
 const commonmark = createRequire(import.meta.url)('./vendor/commonmark.cjs');
 
@@ -6,6 +8,30 @@ function maskFrontMatter(source) {
   return source.replace(/^---[ \t]*\r?\n[\s\S]*?^(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/m, (block) =>
     block.replace(/[^\r\n]/g, ' '),
   );
+}
+
+/**
+ * 抽出器・保護内容照合器が Markdown として扱う拡張子。.md・.mdx に加え、
+ * verify-docs.config.json の extensions に足した拡張子（.markdown など）も含める。
+ */
+export function markdownExtensions(root) {
+  const extensions = new Set(['.md', '.mdx']);
+  const configPath = join(root, 'verify-docs.config.json');
+  if (!existsSync(configPath)) return extensions;
+  try {
+    const { extensions: configured } = JSON.parse(readFileSync(configPath, 'utf8'));
+    if (Array.isArray(configured)) {
+      for (const extension of configured) if (typeof extension === 'string') extensions.add(extension.toLowerCase());
+    }
+  } catch {
+    // 設定の誤りは検証器が報告する。ここでは既定の拡張子で続ける。
+  }
+  return extensions;
+}
+
+export function hasMarkdownExtension(path, extensions) {
+  const lower = path.toLowerCase();
+  return [...extensions].some((extension) => lower.endsWith(extension));
 }
 
 export function parseMarkdown(source) {
