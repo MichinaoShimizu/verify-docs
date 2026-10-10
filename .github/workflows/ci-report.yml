@@ -55,6 +55,7 @@ jobs:
             const rows = [
               ['verify-docs-root-check', 'Markdown のリンク、孤立文書、サイズ、重複段落を検査する。'],
               ['verify-docs-self-check', 'スキルからの `docs/` 参照、配布用 `references/` 生成、導入・再導入・競合拒否・互換リンクを検査する。'],
+              ['verify-docs-minimum-node', '最低対応版の Node.js 22.0.0 で `verify-docs-self-check` と同じ自己検査を実行する。'],
               ['remote-install-smoke', '`main` マージ後に、公開 raw `install.sh` と同じrefのアーカイブから導入し、配布形と導入済み CLI を検査する。'],
             ];
             const body = [
