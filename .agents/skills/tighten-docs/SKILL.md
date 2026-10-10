@@ -102,7 +102,10 @@ node scripts/document-structure-verifier.mjs
 
 - 一時作業記録の全項目にチェックが入っている
 - [自律圧縮モード](../../../docs/autonomous-compression.md)のモード別完了条件を満たしている
-- `node scripts/document-structure-verifier.mjs` が「文書構造: すべて通過」で終わっている
+- `node scripts/document-structure-verifier.mjs` が「文書構造: すべて通過」で終わっている。
+  開始前から違反が残っていた場合は、開始時に `--json` の出力を保存し、
+  `node scripts/document-structure-verifier.mjs --baseline=<保存したファイル>` が通過すること
+  （新たな違反がないこと）で代える
 - 自分の一時作業記録に `### 最終検査結果` を記載して保守報告へ統合し、作業完了を
   報告する際は[保守報告](../../../docs/work-records-and-report.md#保守報告)のパスと実行結果を人に伝える
 

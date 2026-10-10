@@ -19,6 +19,17 @@ node scripts/document-structure-verifier.mjs
 node scripts/document-structure-verifier.mjs --changed-base=origin/main
 ```
 
+## 既存の違反を基準にした検査
+
+開始前から違反が残っている文書群で、作業が新たな違反を生んでいないかを確かめる。
+開始時の `--json` 出力を保存し、作業後に `--baseline` で渡すと、基準にある違反
+（種別・発生元・対象が同じもの）を除いた新たな違反だけを失敗として返す。
+
+```bash
+node scripts/document-structure-verifier.mjs --json > /tmp/verify-docs-baseline.json
+node scripts/document-structure-verifier.mjs --baseline=/tmp/verify-docs-baseline.json
+```
+
 ## 文書構造スナップショットのJSON出力
 
 [文書構造抽出器](structure.md#文書構造抽出器)は、文書重複解消スキル／文書簡潔化スキルで対象文書を調べるときに使う。

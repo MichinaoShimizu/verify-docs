@@ -335,6 +335,21 @@ test('text output lists violation hotspots only when violations are numerous', (
   rmSync(few, { recursive: true, force: true });
 });
 
+test('--baseline reports only violations absent from a saved --json report', () => {
+  const root = makeRepo({
+    'README.md': '# Repo\n\n[old](docs/old-missing.md)\n',
+  });
+  const baselinePath = join(root, 'baseline.json');
+  writeFileSync(baselinePath, JSON.stringify(run(root)));
+  writeFileSync(join(root, 'README.md'), '# Repo\n\n[old](docs/old-missing.md) [new](docs/new-missing.md)\n');
+  const result = verifyDocumentStructure(root, { baselinePath });
+  assert.deepEqual(result.violations.map((f) => f.target), ['docs/new-missing.md']);
+  assert.deepEqual(result.baseline, { path: baselinePath, suppressed: 1 });
+  writeFileSync(join(root, 'not-a-report.json'), '{"kind":"other"}');
+  assert.throws(() => verifyDocumentStructure(root, { baselinePath: join(root, 'not-a-report.json') }), /--json の出力ではありません/);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('uses legacy .claude/skills when .agents/skills is absent', () => {
   const root = makeRepo({
     'README.md': '# Repo\n',
