@@ -243,6 +243,20 @@ test('excludePaths keeps excluded directories out of the scan entirely', () => {
   rmSync(root, { recursive: true, force: true });
 });
 
+test('node_modules and .git in excludePaths are excluded at any depth, other entries only from the root', () => {
+  const broken = '# Broken\n[missing](missing.md)\n';
+  const root = makeRepo({
+    'README.md': '# Repo\n',
+    'packages/a/node_modules/dep/README.md': broken,
+    'packages/a/.git/info.md': broken,
+    'scripts/build/README.md': broken,
+    'build/out.md': broken,
+  });
+  const scanned = [...new Set(run(root).violations.map((f) => f.from))].sort();
+  assert.deepEqual(scanned, ['scripts/build/README.md']);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('uses legacy .claude/skills when .agents/skills is absent', () => {
   const root = makeRepo({
     'README.md': '# Repo\n',

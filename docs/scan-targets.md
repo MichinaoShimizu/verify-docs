@@ -14,6 +14,11 @@
 免除の起点か、`SKILL.md` の目次に載るべき補助文書か）を決めるためだけに
 使う。
 
+`excludePaths` はリポジトリ直下からの位置で照合する。ただし `node_modules/` と `.git/` は
+文書の置き場所になり得ないため、どの階層でも除外する（モノレポの
+`packages/<name>/node_modules/` も含む）。`build/` などは同名の正規の文書置き場が
+あり得るため、直下だけを除外する。
+
 モノレポで各パッケージを個別に `--root=packages/<name>`（詳細は
 `scripts/document-structure-verifier.mjs` の `--root` オプションを
 参照）で検査する場合は、リポジトリ直下の検査からパッケージの

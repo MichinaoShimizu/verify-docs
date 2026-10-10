@@ -272,10 +272,20 @@ export function verifyDocumentStructure(root, { configPath, initSizeExceptions =
   /* entryPoints・docsDir・skillsDir に置き忘れると検査から漏れてしまうため（本ツール
    * 自体がこれで CONTRIBUTING.md の重複を見逃した）、リポジトリ全体の *.md を対象に
    * 走査する。`excludePaths` に列挙したディレクトリ配下のみ除外する（既定は
-   * node_modules・.git・vendor・dist・build）。 */
+   * node_modules・.git・vendor・dist・build）。
+   * `excludePaths` はリポジトリ直下からの位置で照合する。ただし node_modules と .git は
+   * 文書の置き場所になり得ないため、`excludePaths` に含めればどの階層でも除外する。
+   * モノレポの `packages/a/node_modules/` に入った依存パッケージの README まで
+   * 走査しないためである。build・dist などは `scripts/build/` のような正規の文書の
+   * 置き場所と同名になり得るため、直下だけを除外する。 */
 
+  const ANYWHERE = new Set(['node_modules', '.git']);
+  const anywhereNames = new Set(
+    config.excludePaths.map((entry) => entry.replace(/\/+$/, '')).filter((name) => ANYWHERE.has(name)),
+  );
   const isExcluded = (relDir) =>
-    config.excludePaths.some((prefix) => `${relDir}/`.startsWith(prefix));
+    config.excludePaths.some((prefix) => `${relDir}/`.startsWith(prefix))
+    || relDir.split(/[\\/]/).some((segment) => anywhereNames.has(segment));
 
   function walk(dir, hits = []) {
     if (!existsSync(dir)) return hits;
