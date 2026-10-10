@@ -49,6 +49,7 @@ verify-docs パッケージ一式を導入先のリポジトリへ配置する�
 | 導入後の配布範囲 | 必要な `references/` は配置し、不要な `references/` と `evals/` は配置しないこと。 | `verify-docs-self-check` |
 | エージェント互換リンク | Claude/Kiro 用スキルリンクを作り、既存の別スキルは残すこと。 | `verify-docs-self-check` |
 | 導入時の競合 | 既存の異なるファイルまたは同名の Kiro スキルを上書きせず、導入を停止すること。 | `verify-docs-self-check` |
+| 最低対応版 | 導入器が受け付ける最低版の Node.js 22.0.0 で、自己検査一式を実行できること。 | `verify-docs-minimum-node` |
 | 公開導入経路 | 公開済み `main` の raw `install.sh` と同じ ref のアーカイブから導入でき、導入後の構造検査器を実行できること。 | `remote-install-smoke` |
 | 公開導入後の配置 | 公開導入先で `references/` を生成し、`docs/` 全体を配置しないこと。 | `remote-install-smoke` |
 

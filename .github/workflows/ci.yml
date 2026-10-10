@@ -32,6 +32,18 @@ jobs:
       - name: verify-docs の自己検査を実行する（ドッグフーディング）
         run: bash ci-selfcheck.sh
 
+  verify-docs-minimum-node:
+    runs-on: ubuntu-latest
+    steps:
+      # Node 24 ランタイムの v5 を完全長コミット SHA に固定する。
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          # install.sh と README が示す最低対応版。
+          node-version: 22.0.0
+      - name: 最低対応版の Node.js で自己検査を実行する
+        run: bash ci-selfcheck.sh
+
   remote-install-smoke:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
