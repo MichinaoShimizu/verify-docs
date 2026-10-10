@@ -180,6 +180,8 @@ test('tighten-docs autonomous compression mode completes risky compression while
   assert.match(autonomousCompression, /法的・安全上の注意、契約上の義務/);
   assert.match(autonomousCompression, /実行モード: 自律圧縮/);
   assert.match(autonomousCompression, /コードブロック、出力例、テンプレート指令/);
+  assert.match(autonomousCompression, /命題を減らさない/);
+  assert.match(autonomousCompression, /may・should・must/);
   assert.match(autonomousCompression, /--baseline/);
 });
 
