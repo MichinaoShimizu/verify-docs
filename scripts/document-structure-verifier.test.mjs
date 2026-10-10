@@ -160,6 +160,38 @@ test('detects missing fragment', () => {
   rmSync(root, { recursive: true, force: true });
 });
 
+test('recognizes HTML id and name anchors as fragment targets', () => {
+  const root = makeRepo({
+    'README.md': [
+      '# Repo',
+      '',
+      '[step](#step1) [block](#install) [guide](docs/guide.md#legacy) [missing](#nowhere)',
+      '',
+      '## Step 1: Create a branch<a name="step1"></a>',
+      '',
+      '<div id="install">Install</div>',
+      '',
+      '```html',
+      '<a id="nowhere"></a>',
+      '```',
+      '',
+    ].join('\n'),
+    'docs/guide.md': "# Guide\n\n<a id='legacy'></a>\n\nText.\n",
+  });
+  const fragments = run(root).violations.filter((f) => f.kind === 'fragment');
+  assert.deepEqual(fragments.map((f) => f.target), ['#nowhere']);
+  rmSync(root, { recursive: true, force: true });
+});
+
+test('HTML anchors do not shift GitHub duplicate-heading suffixes', () => {
+  const root = makeRepo({
+    'README.md': '# Repo\n\n<a id="setup"></a>\n\n## Setup\n\n## Setup\n\n[first](#setup) [second](#setup-1) [none](#setup-2)\n',
+  });
+  const fragments = run(root).violations.filter((f) => f.kind === 'fragment');
+  assert.deepEqual(fragments.map((f) => f.target), ['#setup-2']);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test('recognizes GitHub-style fragment IDs for duplicate headings', () => {
   const root = makeRepo({
     'README.md': '# Repo\n\n[second duplicate](docs/guide.md#section-2)\n',
